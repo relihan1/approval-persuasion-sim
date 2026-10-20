@@ -11,6 +11,17 @@ test_that("a pure criterion shift leaves d unchanged in the unequal-variance mod
   expect_lt(pt$ev[["T3_tactic"]], -0.03)  # the equal-variance artifact
 })
 
+test_that("the SESOI conversion depends on the criterion variances, not the sensitivity variances", {
+  # The bound scales with the marginal SD of safe-request evidence, so a pilot
+  # that misestimates tau_c or omega_c moves the equivalence bounds.
+  for (p in list(pars, utils::modifyList(pars, list(tau_c = 0.8)),
+                 utils::modifyList(pars, list(omega_c = 0.6)))) {
+    expect_equal(sesoi_on_estimator_scale(p), 0.2 / sqrt(1 + p$tau_c^2 + p$omega_c^2), tolerance = 0.005)
+  }
+  expect_equal(sesoi_on_estimator_scale(utils::modifyList(pars, list(tau_d = 0.5, omega_d = 0.5))),
+               sesoi_on_estimator_scale(pars), tolerance = 0.005)
+})
+
 test_that("a participant-level gain in d is attenuated on the marginal scale as expected", {
   pt <- pseudo_true(with_hypothesis(pars, "vigilance"))
   expected <- 0.3 / sqrt(1 + pars$tau_c^2 + pars$omega_c^2)

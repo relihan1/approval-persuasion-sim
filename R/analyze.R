@@ -136,7 +136,9 @@ contrast_estimates <- function(fit, V, L = contrast_L()) {
 run_tests <- function(ce, sesoi, alpha = 0.05) {
   z <- ce$est / ce$se
   ce$p_dir  <- ifelse(ce$direction == "greater", stats::pnorm(z, lower.tail = FALSE), stats::pnorm(z))
-  ce$p_holm <- stats::p.adjust(ce$p_dir, method = "holm")
+  # n = all six tests: p.adjust() otherwise drops a missing p-value (a negative
+  # two-way variance) from the count and corrects over five.
+  ce$p_holm <- stats::p.adjust(ce$p_dir, method = "holm", n = length(ce$p_dir))
   ce$sig    <- !is.na(ce$p_holm) & ce$p_holm < alpha  # a missing SE never counts as evidence
   ce$p_tost <- pmax(stats::pnorm((ce$est + sesoi) / ce$se, lower.tail = FALSE),
                     stats::pnorm((ce$est - sesoi) / ce$se))

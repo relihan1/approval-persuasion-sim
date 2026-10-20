@@ -105,8 +105,43 @@ coverage$mcse_at_95 <- sqrt(0.95 * 0.05 / coverage$studies)  # Monte Carlo SE of
 # SD of standardized errors should be near 1 when the standard errors are right.
 sims$z <- (sims$est - sims$truth_value) / sims$se
 coverage <- merge(coverage, aggregate(cbind(sd_z = z) ~ truth + test, sims, sd))
+# Two-way errors with t critical values on (requests - 1) df, the small-sample
+# adjustment Cameron et al. (2011) use for few clusters.
+k_req <- pars$n_safe + pars$n_unsafe
+coverage <- merge(coverage, aggregate(cbind(two_way_t = abs(sims$est - sims$truth_value) <=
+                                              qt(0.975, k_req - 1) * sims$se_two_way) ~ truth + test,
+                                      data = sims, FUN = mean, na.rm = TRUE, na.action = na.pass))
+# Calibration: mean standard error over the SD of the estimates, within each
+# true state and sample size, then averaged over sample sizes (1 = right size).
+cal <- do.call(rbind, lapply(split(sims, list(sims$truth, sims$n_per_cell, sims$test), drop = TRUE), function(d)
+  data.frame(truth = d$truth[1], test = d$test[1], se_ratio_pid = mean(d$se) / sd(d$est),
+             se_ratio_two_way = mean(d$se_two_way, na.rm = TRUE) / sd(d$est))))
+coverage <- merge(coverage, aggregate(cbind(se_ratio_pid, se_ratio_two_way) ~ truth + test, cal, mean))
 print(coverage, digits = 3)
 write.csv(coverage, out_path("tables", "coverage_95.csv"), row.names = FALSE)
+
+# ---- If the pilot misestimates the criterion variance --------------------------------
+# The SESOI conversion divides by the marginal SD of safe-request evidence, which
+# depends on tau_c and omega_c. Recompute every study's verdict with the bound a
+# pilot would give if it misestimated tau_c (true value 0.5), or if the 0.20 were
+# used without conversion.
+bounds <- c(setNames(sapply(c(0.3, 0.4, 0.5, 0.6, 0.7, 0.8), function(tc)
+  sesoi_on_estimator_scale(utils::modifyList(pars, list(tau_c = tc)))), paste0("tau_c = ", c(0.3, 0.4, 0.5, 0.6, 0.7, 0.8))),
+  "no conversion" = 0.20)
+by_study <- split(sims[, c("truth", "n_per_cell", "rep", "test", "est", "se", "sig")],
+                  list(sims$truth, sims$n_per_cell, sims$rep), drop = TRUE)
+misest <- do.call(rbind, lapply(names(bounds), function(b) {
+  v <- vapply(by_study, function(d) {
+    d$equiv <- run_tests(transform(d, direction = "greater"), bounds[[b]])$equiv  # TOST ignores direction
+    verdict(d)
+  }, character(1))
+  key <- do.call(rbind, lapply(by_study, function(d) d[1, c("truth", "n_per_cell")]))
+  out <- aggregate(cbind(p_correct = v == correct_verdict[key$truth]) ~ truth + n_per_cell, key, mean)
+  cbind(assumed = b, sesoi = bounds[[b]], out)
+}))
+misest <- misest[order(misest$assumed, misest$truth, misest$n_per_cell), ]
+print(misest[misest$n_per_cell %in% c(100, 125), ], digits = 3, row.names = FALSE)
+write.csv(misest, out_path("tables", "sesoi_misestimation.csv"), row.names = FALSE)
 
 # ---- What an equal-variance analysis concludes under the cue account ---------------
 cue_tac <- sims[sims$truth == "cue" & sims$test == "T3_tactic", ]
