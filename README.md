@@ -88,7 +88,9 @@ Each simulated study draws new participants and new requests. Every value is set
 - participant intercepts and sensitivities;
 - request intercepts, tactic effects, and trained reviewers' reaction to each request's tactics.
 
-It estimates participant-level effects, so the smallest effect of interest (SESOI) is a change of 0.20 in *d*. A full-size fit is expected to take hours; this hasn't been timed here.
+It estimates participant-level effects, so the smallest effect of interest (SESOI) is a change of 0.20 in *d*. Its formula has no palter term; the request intercepts absorb paltering's average cost.
+
+A full-size fit (900 participants, 43,200 reviews, four chains of 2,000 iterations) took 208 minutes on four cores. Under the cue account it reached the cue verdict, as did the fast estimator on the same simulated study (`brms_vs_fast_full_cue.csv`). The largest R-hat was 1.01, but Stan warned that the bulk and tail effective sample sizes were low; the smallest bulk ESS among the location coefficients was 212. At that speed, the repeated full-size fits needed to estimate this model's error rates are out of reach on one workstation. The fits under the other three true states were still running when this was written.
 
 ### Fast estimator for the power analysis
 
