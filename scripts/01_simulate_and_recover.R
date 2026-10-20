@@ -61,7 +61,9 @@ cat(sprintf("Verdict: %s | zROC slope: %.2f (pseudo-true %.2f; 0.80 per particip
 
 # ---- 4. The equal-variance analysis of the same data ------------------------
 # A binary probit GLMM with crossed participant and request intercepts
-# (DeCarlo, 1998). Because yes/no responses can't identify unequal variances,
+# (DeCarlo, 1998). With one approve/reject threshold, each design cell gives a
+# single ROC point (ratings trace the ROC within a cell; DeCarlo, 1998, p. 189),
+# so with a free mean in every cell the model must assume equal variances, and
 # the criterion shift that training produces on tactic-laden requests shows up
 # as a change in d.
 glmm <- lme4::glmer(reject ~ unsafe * tactic * trained * screen + trial_c + (1 | pid) + (1 | item),

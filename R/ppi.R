@@ -6,8 +6,8 @@
 # prediction) with a large unlabeled sample (simulator predictions only). The
 # labeled sample measures the simulator's error and corrects for it, so the
 # interval stays valid however biased the simulator is. PPI++ (Angelopoulos,
-# Duchi, & Zrnic, 2023, preprint) scales the correction by lambda and so never
-# does worse than the people-only interval asymptotically.
+# Duchi, & Zrnic, 2024, arXiv:2311.01453v2) scales the correction by lambda and
+# so never does worse than the people-only interval asymptotically.
 
 # ---- Estimators of a population mean ---------------------------------------
 
@@ -31,7 +31,7 @@ ppi_mean <- function(y_lab, f_lab, f_unl, lambda = 1, level = 0.95) {
   out
 }
 
-# Plug-in lambda for the mean (Angelopoulos, Duchi, & Zrnic, 2023, Example 6.1):
+# Plug-in lambda for the mean (Angelopoulos, Duchi, & Zrnic, 2024, Example 6.1):
 # Cov_n(Y, f) / ((1 + n/N) Var_{n+N}(f)).
 ppi_lambda_hat <- function(y_lab, f_lab, f_unl) {
   n <- length(y_lab); N <- length(f_unl)
@@ -51,9 +51,11 @@ ci_row <- function(est, se, level) {
 # A simulated reviewer is built from a profile of the person. The profile
 # predicts the person's criterion, sensitivity, and tactic susceptibility with
 # accuracy r.
-# Three failure modes reported for LLM simulations are built in: a cautious
-# lean toward rejecting, weak sensitivity to wording, and person-level
-# predictions limited by what a profile can reveal.
+# Three failure modes are built in as assumptions: a cautious lean toward
+# rejecting, weak sensitivity to wording, and person-level predictions limited
+# by what a profile can reveal. Only the third has support in the cited work
+# (Krsteski et al., 2025, find individual-level simulation much harder than
+# population estimates); the sizes of all three are settings, not measurements.
 
 simulator_defaults <- function() {
   list(caution = 0.3,       # simulated reviewers lean toward reject (latent units)
