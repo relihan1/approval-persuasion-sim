@@ -23,6 +23,17 @@ test_that("Holm corrects over all six tests even when one standard error is miss
   expect_equal(r$p_holm[2], max(4 * r$p_dir[2], r$p_holm[5], r$p_holm[6]))
 })
 
+test_that("dropping the palter terms for the brms model keeps the test directions", {
+  L <- contrast_L()
+  L2 <- drop_absent_terms(L, grep("palter", colnames(L), value = TRUE, invert = TRUE))
+  expect_false(any(grepl("palter", colnames(L2))))
+  expect_identical(attr(L2, "direction"), attr(L, "direction"))
+  expect_error(drop_absent_terms(L, "unsafe"))  # only palter terms may be missing
+  # The threat, cue, and training contrasts give the palter terms no weight,
+  # so dropping them changes only the evidence contrasts T4 and T5.
+  expect_true(all(L[c("T1", "T2", "T3_plain", "T3_tactic"), grepl("palter", colnames(L))] == 0))
+})
+
 test_that("TOST and directional p-values behave", {
   ce <- data.frame(test = "x", est = 0, se = 0.05, direction = "greater")
   r <- run_tests(ce, sesoi = 0.2)

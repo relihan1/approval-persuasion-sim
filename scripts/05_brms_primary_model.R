@@ -48,9 +48,7 @@ primary_priors <- c(
 posterior_contrasts <- function(fit, L = contrast_L(), sesoi = 0.20) {
   # This formula has no palter terms (the fast estimator's does); their contrast
   # weights drop out, and the request intercepts absorb paltering's average cost.
-  have <- paste0("b_", colnames(L)) %in% brms::variables(fit)
-  stopifnot(all(grepl("palter", colnames(L)[!have])))
-  L <- L[, have, drop = FALSE]
+  L <- drop_absent_terms(L, sub("^b_", "", brms::variables(fit)))
   draws <- as.matrix(fit, variable = paste0("b_", colnames(L)))[, paste0("b_", colnames(L))]
   est <- draws %*% t(L)
   q <- function(p) apply(est, 2, stats::quantile, p)

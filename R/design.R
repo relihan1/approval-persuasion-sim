@@ -167,5 +167,15 @@ contrast_L <- function(W = planned_contrasts()) {
   L
 }
 
+# For a model without the palter terms (the brms primary model): drop those
+# columns of L, keeping the test directions, which column subsetting would lose.
+drop_absent_terms <- function(L, coef_names) {
+  have <- colnames(L) %in% coef_names
+  stopifnot(all(grepl("palter", colnames(L)[!have])))
+  out <- L[, have, drop = FALSE]
+  attr(out, "direction") <- attr(L, "direction")
+  out
+}
+
 # The verdict each true state should produce.
 correct_verdict <- c(cue = "cue", vigilance = "vigilance", both = "both", null = "null")
