@@ -1,0 +1,5 @@
+"truth","verdict_primary","verdict_primary_holm","verdict_fast_pid","verdict_fast_two_way_jk","correct","max_rhat","min_ess_bulk","min_ess_tail"
+"both","both","both","both","both","both",1.02396482515448,171.659196744047,299.247911372373
+"cue","cue","cue","cue","cue","cue",1.01026031072825,211.757644750146,423.751686554746
+"null","null","null","null","null","null",1.01262659985424,275.981809422657,641.059334881119
+"vigilance","vigilance","vigilance","vigilance","both","vigilance",1.03765453846619,138.576648093914,348.36817366488

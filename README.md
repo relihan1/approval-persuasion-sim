@@ -90,7 +90,18 @@ Each simulated study draws new participants and new requests. Every value is set
 
 It estimates participant-level effects, so the smallest effect of interest (SESOI) is a change of 0.20 in *d*. Its formula has no palter term; the request intercepts absorb paltering's average cost.
 
-A full-size fit (900 participants, 43,200 reviews, four chains of 2,000 iterations) took 208 minutes on four cores. Under the cue account it reached the cue verdict, as did the fast estimator on the same simulated study (`brms_vs_fast_full_cue.csv`). The largest R-hat was 1.01, but Stan warned that the bulk and tail effective sample sizes were low; the smallest bulk ESS among the location coefficients was 212. At that speed, the repeated full-size fits needed to estimate this model's error rates are out of reach on one workstation. The fits under the other three true states were still running when this was written.
+A full-size fit (900 participants, 43,200 reviews, four chains of 2,000 iterations) took 208 minutes on four cores when it had the machine to itself (the cue state); the other three, run alongside each other and the simulations, took several hours each. Every fit uses the same simulated study (seed 5) and the same Stan seed, and rerunning two of them reproduced their posterior summaries exactly. Script 05b compares the verdicts (`brms_rule_comparison.csv`):
+
+| True state | Primary model, 95% rule | Primary model, rule matched to the fast estimator | Fast estimator, participant-clustered | Fast estimator, two-way with jackknife | Largest R-hat | Smallest bulk ESS |
+|---|---|---|---|---|---|---|
+| Cue | Cue | Cue | Cue | Cue | 1.010 | 212 |
+| Vigilance | Vigilance | Vigilance | Vigilance | Both | 1.038 | 139 |
+| Neither | Neither | Neither | Neither | Neither | 1.013 | 276 |
+| Both | Both | Both | Both | Both | 1.024 | 172 |
+
+R-hat and ESS are for the location coefficients. The primary model reached the right verdict in all four states under either rule. The fast estimator with jackknifed two-way errors called the vigilance study "both" because it falsely detected a cue effect. At this sample size, that happened in 6.4% of vigilance-state studies in script 02 (`verdicts_two_way_jackknife.csv`).
+
+These fits need more work before their intervals can be trusted to the second decimal: Stan warned of low bulk and tail effective sample sizes in every fit, and the largest R-hat was above 1.01 in three of the four. And one fit per state says nothing about the primary model's error rates. At 3.5 hours or more per fit, the 100 fits that 25 per state would need are out of reach on one workstation.
 
 ### Fast estimator for the power analysis
 
