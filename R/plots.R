@@ -35,24 +35,30 @@ cell_eta <- function(fit, grid = cell_grid()) {
 
 # Figure: ROC curves for tactic-laden requests on the argument screen,
 # control vs trained, under the cue and the vigilance accounts.
-plot_roc <- function(fits) {
+plot_roc <- function(fits, palter_share = 0.5) {
   curves <- points <- list()
   for (h in names(fits)) {
     fit <- fits[[h]]
-    g <- cell_eta(fit)
-    g <- g[g$tactic == 1 & g$screen == "argument", ]
+    # Unsafe requests are a mix of paltering and non-paltering ones, so the hit
+    # rate averages over the two.
+    pick <- function(p) {
+      g <- cell_eta(fit, transform(cell_grid(), palter = unsafe * p))
+      g[g$tactic == 1 & g$screen == "argument", ]
+    }
+    g0 <- pick(0); g1 <- pick(1)
     sig <- exp(fit$zeta)
+    hit_at <- function(th, tr) {
+      e0 <- g0$eta[g0$unsafe == 1 & g0$trained == tr]; e1 <- g1$eta[g1$unsafe == 1 & g1$trained == tr]
+      (1 - palter_share) * (1 - stats::pnorm((th - e0) / sig)) + palter_share * (1 - stats::pnorm((th - e1) / sig))
+    }
     for (tr in 0:1) {
-      es <- g$eta[g$unsafe == 0 & g$trained == tr]
-      eu <- g$eta[g$unsafe == 1 & g$trained == tr]
+      es <- g0$eta[g0$unsafe == 0 & g0$trained == tr]
       lab <- if (tr == 1) "Trained" else "Control"
       th <- seq(-6, 8, length.out = 400)
       curves[[length(curves) + 1]] <- data.frame(
-        account = h, group = lab,
-        fa = 1 - stats::pnorm(th - es), hit = 1 - stats::pnorm((th - eu) / sig))
+        account = h, group = lab, fa = 1 - stats::pnorm(th - es), hit = hit_at(th, tr))
       points[[length(points) + 1]] <- data.frame(
-        account = h, group = lab,
-        fa = 1 - stats::pnorm(fit$alpha - es), hit = 1 - stats::pnorm((fit$alpha - eu) / sig),
+        account = h, group = lab, fa = 1 - stats::pnorm(fit$alpha - es), hit = hit_at(fit$alpha, tr),
         cut = seq_along(fit$alpha))
     }
   }

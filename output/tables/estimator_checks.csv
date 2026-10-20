@@ -1,4 +1,4 @@
 "check","value"
-"sesoi_unequal_variance",0.172912373515986
-"sesoi_equal_variance_binary",0.136660463735737
-"max_coef_diff_row_vs_pattern_fit",5.48866507799062e-15
+"sesoi_unequal_variance",0.172746035576709
+"sesoi_equal_variance_binary",0.138632343627294
+"max_coef_diff_row_vs_pattern_fit",2.22044604925031e-15

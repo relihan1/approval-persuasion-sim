@@ -46,6 +46,11 @@ primary_priors <- c(
 # alpha = .05. The same verdict() then applies. This rule has no multiplicity
 # correction; its error rates have to be checked by repeated full-size fits.
 posterior_contrasts <- function(fit, L = contrast_L(), sesoi = 0.20) {
+  # This formula has no palter terms (the fast estimator's does); their contrast
+  # weights drop out, and the request intercepts absorb paltering's average cost.
+  have <- paste0("b_", colnames(L)) %in% brms::variables(fit)
+  stopifnot(all(grepl("palter", colnames(L)[!have])))
+  L <- L[, have, drop = FALSE]
   draws <- as.matrix(fit, variable = paste0("b_", colnames(L)))[, paste0("b_", colnames(L))]
   est <- draws %*% t(L)
   q <- function(p) apply(est, 2, stats::quantile, p)

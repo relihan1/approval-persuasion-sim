@@ -73,11 +73,13 @@ one_rep <- function(i) {
   tt_two <- run_tests(transform(tt[, c("test", "est", "direction")], se = tt$se_two_way), su$sesoi)
   data.frame(scenario = g$scenario, state = g$state, rep = g$rep,
              verdict_pid = res$verdict_pid, verdict_two_way = res$verdict_two_way,
+             verdict_two_way_jk = res$verdict_two_way_jk,
              test = tt$test, truth = unname(su$truth[tt$test]), est = tt$est,
-             se_pid = tt$se_pid, se_two_way = tt$se_two_way,
-             equiv_pid = tt$equiv, equiv_two_way = tt_two$equiv,
+             se_pid = tt$se_pid, se_two_way = tt$se_two_way, se_two_way_jk = tt$se_two_way_jk,
+             equiv_pid = tt$equiv, equiv_two_way = tt_two$equiv, equiv_two_way_jk = res$tests_two_way_jk$equiv,
              cover_pid = abs(tt$est - su$truth[tt$test]) <= z * tt$se_pid,
-             cover_two_way = abs(tt$est - su$truth[tt$test]) <= z * tt$se_two_way)
+             cover_two_way = abs(tt$est - su$truth[tt$test]) <= z * tt$se_two_way,
+             cover_two_way_jk = abs(tt$est - su$truth[tt$test]) <= z * tt$se_two_way_jk)
 }
 
 # SIM_REUSE=1 summarizes the saved simulations instead of rerunning them.
@@ -93,27 +95,33 @@ if (identical(Sys.getenv("SIM_REUSE"), "1") && file.exists(rds)) {
   saveRDS(sims, rds)
 }
 
-studies <- unique(sims[, c("scenario", "state", "rep", "verdict_pid", "verdict_two_way")])
-studies$correct_pid <- studies$verdict_pid == correct_verdict[studies$state]
-studies$correct_two_way <- studies$verdict_two_way == correct_verdict[studies$state]
-verdicts <- aggregate(cbind(correct_pid, correct_two_way) ~ scenario + state, studies, mean)
+# Three kinds of errors: participant-clustered (pid), analytic two-way
+# (two_way), and two-way with the request jackknife (two_way_jk).
+studies <- unique(sims[, c("scenario", "state", "rep", "verdict_pid", "verdict_two_way", "verdict_two_way_jk")])
+for (k in c("pid", "two_way", "two_way_jk")) {
+  studies[[paste0("correct_", k)]] <- studies[[paste0("verdict_", k)]] == correct_verdict[studies$state]
+}
+verdicts <- aggregate(cbind(correct_pid, correct_two_way, correct_two_way_jk) ~ scenario + state, studies, mean)
 
-cov <- aggregate(cbind(cover_pid, cover_two_way) ~ scenario + state, sims, mean,
+cov <- aggregate(cbind(cover_pid, cover_two_way, cover_two_way_jk) ~ scenario + state, sims, mean,
                  na.action = na.pass, na.rm = TRUE)
-by_test <- aggregate(cbind(cover_pid, cover_two_way) ~ scenario + test,
+by_test <- aggregate(cbind(cover_pid, cover_two_way, cover_two_way_jk) ~ scenario + test,
                      sims, mean, na.action = na.pass, na.rm = TRUE)
 by_test$two_way_na <- aggregate(cbind(na = is.na(cover_two_way)) ~ scenario + test, sims, sum,
                                 na.action = na.pass)$na
+by_test$two_way_jk_na <- aggregate(cbind(na = is.na(cover_two_way_jk)) ~ scenario + test, sims, sum,
+                                   na.action = na.pass)$na
 by_test <- by_test[order(match(by_test$scenario, names(scenarios)), by_test$test), ]
 write.csv(by_test, out_path("tables", "sensitivity_coverage_by_test.csv"), row.names = FALSE)
-worst <- aggregate(cbind(min_cover_pid = cover_pid, min_cover_two_way = cover_two_way) ~ scenario,
-                   by_test, min)
+worst <- aggregate(cbind(min_cover_pid = cover_pid, min_cover_two_way = cover_two_way,
+                         min_cover_two_way_jk = cover_two_way_jk) ~ scenario, by_test, min)
 
 summary_tab <- merge(merge(verdicts, cov), worst)
 summary_tab$n_per_cell <- sapply(paste(summary_tab$scenario, summary_tab$state), function(k) setup[[k]]$pars$n_per_cell)
 summary_tab$sesoi <- sapply(paste(summary_tab$scenario, summary_tab$state), function(k) setup[[k]]$sesoi)
 summary_tab$mcse_correct <- sqrt(summary_tab$correct_pid * (1 - summary_tab$correct_pid) / R)
 summary_tab$mcse_correct_two_way <- sqrt(summary_tab$correct_two_way * (1 - summary_tab$correct_two_way) / R)
+summary_tab$mcse_correct_two_way_jk <- sqrt(summary_tab$correct_two_way_jk * (1 - summary_tab$correct_two_way_jk) / R)
 summary_tab <- summary_tab[order(match(summary_tab$scenario, names(scenarios)), summary_tab$state), ]
 print(summary_tab, digits = 3, row.names = FALSE)
 write.csv(summary_tab, out_path("tables", "sensitivity_summary.csv"), row.names = FALSE)
@@ -121,8 +129,9 @@ write.csv(summary_tab, out_path("tables", "sensitivity_summary.csv"), row.names 
 # Request-slope sweep: participant-clustered against two-way clustered errors,
 # by sample size.
 sweep <- summary_tab[grepl("^request_slopes", summary_tab$scenario),
-                     c("n_per_cell", "state", "correct_pid", "correct_two_way",
-                       "cover_pid", "cover_two_way", "min_cover_pid", "min_cover_two_way")]
+                     c("n_per_cell", "state", "correct_pid", "correct_two_way", "correct_two_way_jk",
+                       "cover_pid", "cover_two_way", "cover_two_way_jk",
+                       "min_cover_pid", "min_cover_two_way", "min_cover_two_way_jk")]
 sweep$requests <- sapply(paste(summary_tab$scenario, summary_tab$state)[grepl("^request_slopes", summary_tab$scenario)],
                          function(k) setup[[k]]$pars$n_safe + setup[[k]]$pars$n_unsafe)
 sweep <- sweep[order(sweep$state, sweep$requests, sweep$n_per_cell), ]
@@ -134,7 +143,8 @@ write.csv(sweep, out_path("tables", "sensitivity_request_slopes_sweep.csv"), row
 # equivalent in at most 5% of studies.
 at_sesoi <- sims[sims$scenario == "gamma_at_sesoi" & sims$state == "vigilance" &
                    sims$test %in% c("T3_plain", "T3_tactic"), ]
-size_tab <- aggregate(cbind(equiv_pid, equiv_two_way) ~ test, at_sesoi, mean)
+size_tab <- aggregate(cbind(equiv_pid, equiv_two_way, equiv_two_way_jk) ~ test, at_sesoi, mean,
+                      na.action = na.pass)
 # The same, with the wider bound a pilot gives if it underestimates tau_c
 # (0.3 instead of 0.5), or with the 0.20 used unconverted.
 tost_rate <- function(se, bound) {
@@ -146,6 +156,7 @@ wide <- c(pilot_tau_c_0.3 = sesoi_on_estimator_scale(utils::modifyList(base, lis
 for (b in names(wide)) {
   size_tab[[paste0("equiv_pid_", b)]] <- unname(tost_rate(at_sesoi$se_pid, wide[[b]]))
   size_tab[[paste0("equiv_two_way_", b)]] <- unname(tost_rate(at_sesoi$se_two_way, wide[[b]]))
+  size_tab[[paste0("equiv_two_way_jk_", b)]] <- unname(tost_rate(at_sesoi$se_two_way_jk, wide[[b]]))
 }
 size_tab$mcse_at_5pct <- sqrt(0.05 * 0.95 / R)
 print(size_tab, digits = 3, row.names = FALSE)

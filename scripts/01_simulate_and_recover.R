@@ -41,8 +41,7 @@ a <- aggregate_reviews(dat)
 fit_agg <- fit_uv(a$agg)
 dat_rows <- transform(dat, y = factor(rating, levels = 1:6, ordered = TRUE),
                       unsafe_s = unsafe, trial_c = block_c)
-fit_rows <- clm(y ~ unsafe * tactic * trained * screen + trial_c, scale = ~ unsafe_s,
-                data = dat_rows, link = "probit")
+fit_rows <- clm(location_formula, scale = ~ unsafe_s, data = dat_rows, link = "probit")
 max_diff <- max(abs(coef(fit_rows) - coef(fit_agg)))
 cat(sprintf("Largest coefficient difference, row-level vs pattern-level fit: %.1e\n", max_diff))
 write.csv(data.frame(check = c("sesoi_unequal_variance", "sesoi_equal_variance_binary",
@@ -66,7 +65,8 @@ cat(sprintf("Verdict: %s | zROC slope: %.2f (pseudo-true %.2f; 0.80 per particip
 # so with a free mean in every cell the model must assume equal variances, and
 # the criterion shift that training produces on tactic-laden requests shows up
 # as a change in d.
-glmm <- lme4::glmer(reject ~ unsafe * tactic * trained * screen + trial_c + (1 | pid) + (1 | item),
+glmm <- lme4::glmer(reject ~ unsafe * tactic * trained * screen + palter + palter:screen + trial_c +
+                      (1 | pid) + (1 | item),
                     data = dat, family = binomial(link = "probit"), nAGQ = 0)
 L <- contrast_L()
 b <- lme4::fixef(glmm)[colnames(L)]

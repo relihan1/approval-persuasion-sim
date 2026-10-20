@@ -38,7 +38,7 @@ The design crosses tactics with safety, so the two accounts make different predi
 
 ![Figure 1](output/figures/fig1_roc_cue_vs_vigilance.png)
 
-*Figure 1.* Population ROC curves for tactic-laden requests on the argument screen. Points mark the five rating thresholds. Left: the cue account (κ = 0.5, γ = 0). Right: the vigilance account (κ = 0, γ = 0.3). The curves are asymmetric because evidence from unsafe requests varies more than evidence from safe ones.
+*Figure 1.* Population ROC curves for tactic-laden requests on the argument screen. Points mark the five rating thresholds. Left: the cue account (κ = 0.5, γ = 0). Right: the vigilance account (κ = 0, γ = 0.3). Hit rates average over paltering and non-paltering unsafe requests. The curves are asymmetric because evidence from unsafe requests varies more than evidence from safe ones.
 
 ## Data-generating model
 
@@ -92,14 +92,15 @@ It estimates participant-level effects, so the smallest effect of interest (SESO
 
 ### Fast estimator for the power analysis
 
-`R/analyze.R` fits the same unequal-variance ordinal probit model without random effects (`ordinal::clm` with a scale term). Four points about it:
+`R/analyze.R` fits the same unequal-variance ordinal probit model without random effects (`ordinal::clm` with a scale term). It adds a palter-by-screen term, because which unsafe requests palter is known from the stimulus bank and the evidence screen removes paltering's cost. Each design cell's mean averages over the bank's mix of paltering and non-paltering requests. Five points about it:
 
-- It fits frequency-weighted response patterns, which reproduces the row-level fit to within 6 × 10⁻¹⁵ (`estimator_checks.csv`) and takes a fraction of a second.
-- Standard errors come from a participant-clustered sandwich built from analytic score contributions, which the tests check against numerical derivatives.
+- It fits frequency-weighted response patterns, which reproduces the row-level fit to within 3 × 10⁻¹⁵ (`estimator_checks.csv`) and takes a fraction of a second.
+- Standard errors come from cluster-robust sandwiches built from analytic score contributions, which the tests check against numerical derivatives. The default clusters on participants.
+- Two alternatives cluster on requests as well. The analytic two-way version adds the participant- and request-clustered parts and subtracts the observation-level part (Cameron et al., 2011). The jackknifed version replaces the request-clustered part with the delete-one-request jackknife, which refits the model 48 times per study (Cameron et al., 2008). Jackknife-type corrections tend to over-correct the downward bias of cluster-robust errors (Pustejovsky & Tipton, 2018), so it should err on the conservative side.
 - It targets population-averaged parameters, which are smaller than participant-level ones.
 - To compare like with like, the code computes its exact pseudo-true values: it integrates the random effects analytically and fits the estimator to the expected rating frequencies.
 
-On the fast estimator's scale, a participant-level change of 0.20 in *d* is 0.173. On the scale of the binary equal-variance model used for comparison, it is 0.137 (`estimator_checks.csv`). Both conversions use the generating variance components; a real study would take them from the pilot.
+On the fast estimator's scale, a participant-level change of 0.20 in *d* is 0.173. On the scale of the binary equal-variance model used for comparison, it is 0.139 (`estimator_checks.csv`). Both conversions use the generating variance components; a real study would take them from the pilot.
 
 ### Preregistered contrasts
 
@@ -139,13 +140,13 @@ Every number below names the table in `output/tables/` it comes from. With 1,000
 
 Under the cue account, training moves only the criterion, so the true change in *d* is zero.
 
-The unequal-variance model fitted to the confidence ratings recovers that zero; its pseudo-true value is below 0.001 (`pseudo_true_values.csv`). It concluded that training lowered *d* for tactic-laden requests (one-sided *p* < .05, uncorrected) in 3.5% to 5.1% of studies, close to the nominal 5% (`equal_variance_false_conclusions.csv`).
+The unequal-variance model fitted to the confidence ratings recovers that zero; its pseudo-true value is 0 to four decimals (`pseudo_true_values.csv`). It concluded that training lowered *d* for tactic-laden requests (one-sided *p* < .05, uncorrected) in 3.4% to 5.3% of studies, close to the nominal 5% (`equal_variance_false_conclusions.csv`).
 
-An equal-variance probit fitted to the approve/reject decisions is signal detection theory written as a probit model (DeCarlo, 1998). With one approve/reject threshold, each design cell gives a single ROC point, whereas confidence ratings trace the ROC within a cell (DeCarlo, 1998). Because every cell has its own mean, the binary model can't separate the variance of unsafe-request evidence from that mean, so it reads part of the criterion shift as a loss of discrimination. Its pseudo-true change is −0.075 (`pseudo_true_values.csv`). At 100 to 150 participants per cell:
+An equal-variance probit fitted to the approve/reject decisions is signal detection theory written as a probit model (DeCarlo, 1998). With one approve/reject threshold, each design cell gives a single ROC point, whereas confidence ratings trace the ROC within a cell (DeCarlo, 1998). Because every cell has its own mean, the binary model can't separate the variance of unsafe-request evidence from that mean, so it reads part of the criterion shift as a loss of discrimination. Its pseudo-true change is −0.071 (`pseudo_true_values.csv`). At 100 to 150 participants per cell:
 
-- It reached the same wrong conclusion in 41% to 52% of studies (Figure 2; `equal_variance_false_conclusions.csv`).
-- Its equivalence test, judged against its own SESOI, passed in 31% to 42% of studies, against 95% to 99% for the unequal-variance model (same table).
-- As a result, it returned the correct cue verdict in 20% to 36% of studies, against 91% to 94% (`correct_verdict_rates.csv`).
+- It reached the same wrong conclusion in 37% to 48% of studies (Figure 2; `equal_variance_false_conclusions.csv`).
+- Its equivalence test, judged against its own SESOI, passed in 34% to 47% of studies, against 96% to 99% for the unequal-variance model (same table).
+- As a result, it returned the correct cue verdict in 22% to 41% of studies, against 91% to 95% (`correct_verdict_rates.csv`).
 
 The low equivalence rate has two sources: the binary estimate centers on the wrong value, and binary decisions carry less information than ratings, so its standard error is wider relative to its own bound (`power_simulations.rds`).
 
@@ -159,18 +160,17 @@ In the one simulated study in script 01, a binary probit GLMM with crossed parti
 
 Coverage was computed over 5,000 studies for each true state and contrast, pooling the five sample sizes (`coverage_95.csv`). The Monte Carlo band around 95% is 94.4% to 95.6%.
 
-- **Participant-clustered intervals** covered the pseudo-true value 94.0% to 95.9% of the time, and the SD of the standardized errors ranged from 0.96 to 1.04. Seven of the eight T4 and T5 rates were below 95% (94.0% to 94.5%, two of them below the Monte Carlo band), and the SD of their standardized errors was 1.01 to 1.04 in every true state. So the standard errors for the evidence contrasts run slightly small.
-- **Model-based errors** covered 92.3% to 97.6%.
-- **Errors clustered on requests as well** (two-way; Cameron et al., 2011):
-  - **T1 to T3** were covered 87.4% to 92.5% of the time. Their standard errors averaged 0.88 to 0.97 times the SD of the estimates (`se_ratio_two_way`), so they run small. Cameron et al.'s theory assumes many clusters in both dimensions, and each study has only 48 requests. Their small-sample adjustment, *t* critical values on 47 degrees of freedom, raised coverage by less than a point (to 88.1% to 93.0%; `two_way_t`).
-  - **T4 and T5** were covered 99.6% to 99.9% of the time, with standard errors 1.76 to 1.84 times the SD of the estimates. That isn't a few-clusters problem. The evidence screen removes the cost of paltering, so on the evidence contrasts the paltering and non-paltering unsafe requests differ by design. The fast estimator leaves out which requests palter, and two-way clustering counts that fixed difference as noise between requests. A palter-by-screen term in the model should remove it; that hasn't been tested here.
-  - In 90 to 100 of the 5,000 studies, T1 had a negative variance. The code reports those as missing rather than applying Cameron et al.'s fix of setting negative eigenvalues to zero, and Holm's correction still counts all six tests.
+- **Participant-clustered intervals** covered the pseudo-true value 94.3% to 95.9% of the time, and the SD of the standardized errors ranged from 0.96 to 1.04. The lowest rates were for T4 and T5 (94.3% to 94.9%).
+- **Model-based errors** covered 92.1% to 97.3%.
+- **Analytic two-way errors** (Cameron et al., 2011) covered 89.0% to 92.5% for every contrast. Their standard errors averaged 0.84 to 0.97 times the SD of the estimates (`se_ratio_two_way`), so they run small. Cameron et al.'s theory assumes many clusters in both dimensions, and each study has only 48 requests. Their small-sample adjustment, *t* critical values on 47 degrees of freedom, raised coverage by less than a point (to 89.7% to 93.0%; `two_way_t`). In 47 to 62 of the 5,000 studies, T1 had a negative variance; the code reports those as missing rather than applying Cameron et al.'s fix of setting negative eigenvalues to zero, and Holm's correction still counts all six tests.
+- **Two-way errors with the request jackknife** covered 91.4% to 93.0%, with standard errors 0.94 to 1.04 times the SD of the estimates (`two_way_jk`, `se_ratio_two_way_jk`). The jackknife removes most of the bias but not the undercoverage. That fits standard errors that are right on average but vary from study to study, because the request part rests on 48 requests, and only 12 of them carry the unsafe side of T1 and T3. T1's jackknifed variance was negative in 31 to 41 of the 5,000 studies.
+- **The palter term matters for the two-way errors.** Without it, the evidence contrasts T4 and T5 had two-way errors far too large: the evidence screen removes paltering's cost, so paltering and non-paltering unsafe requests differ by design on those contrasts, and request clustering counted that fixed difference as noise.
 
 These results hold only while requests don't differ in how tactics and training affect them, which is what the defaults assume. Section 4 drops that assumption.
 
 ### 3. Sample size
 
-Detecting a vigilance gain the size Simchon et al. report (γ = 0.3) took few participants: the T3 tests rejected in 94.9% to 97.2% of studies at 50 per cell, and in at least 99.3% from 75 per cell (`power_by_test.csv`). The harder claim is that training did *not* change discrimination, because both equivalence tests have to pass. Each passed in about 62% of cue-account studies at 50 per cell, and in 95% to 98% at 100 to 125 (same table).
+Detecting a vigilance gain the size Simchon et al. report (γ = 0.3) took few participants: the T3 tests rejected in 94.9% to 97.3% of studies at 50 per cell, and in at least 99.3% from 75 per cell (`power_by_test.csv`). The harder claim is that training did *not* change discrimination, because both equivalence tests have to pass. Each passed in about 62% of cue-account studies at 50 per cell, and in 95% to 98% at 100 to 125 (same table).
 
 Across the true states (`correct_verdict_rates.csv`):
 
@@ -178,62 +178,63 @@ Across the true states (`correct_verdict_rates.csv`):
 - At 125 per cell (750 participants), it did so in at least 92.6%.
 - Under the vigilance account, the correct-verdict rate levels off near 95% (94.2% to 95.2%). Once the other tests reject, Holm's procedure tests T2 at α = .05, so about 5% of those studies falsely detect a cue effect and get the verdict "both" (`verdicts_unequal_variance.csv`).
 
-These rates use participant-clustered errors and the SESOI converted with the true variance components.
+These rates use participant-clustered errors and the SESOI converted with the true variance components. With two-way errors and the request jackknife (`p_correct_two_way_jk` in the same table), the correct-verdict rates at 100 per cell were .86 (cue), .85 (neither), .94 (vigilance), and 1.00 (both); at 125 per cell, .90, .90, .94, and 1.00. 100 per cell is again the smallest size at which every state reaches .80.
 
 The conversion divides by the SD of safe-request evidence, so it depends on how much participants and requests differ in their overall tendency to reject (τ_c and ω_c), and a pilot estimates those with error. `sesoi_misestimation.csv` recomputes every study's verdict with the bound a pilot would produce. If the pilot put τ_c at 0.8 instead of 0.5, the bound would shrink from 0.173 to 0.152. At 100 per cell, the correct cue and neither verdicts would then fall from .91 and .87 to .76 and .74; at 125 per cell, from .93 and .94 to .87 and .88. A pilot that underestimates τ_c widens the bound, which raises these rates but makes a real gain at the SESOI easier to mistake for no change.
 
 ![Figure 3](output/figures/fig3_adjudication.png)
 
-*Figure 3.* (A) Share of simulated studies in which the preregistered rule reaches the correct verdict, by sample size; series are offset slightly so overlapping points stay visible, and the grey line marks .80. (B) Verdicts by true state at 100 participants per cell.
+*Figure 3.* (A) Share of simulated studies in which the preregistered rule, with participant-clustered errors, reaches the correct verdict, by sample size; series are offset slightly so overlapping points stay visible, and the grey line marks .80. (B) Verdicts by true state at 100 participants per cell.
 
 ### 4. Sensitivity
 
-Script 06 changes one assumption at a time at 125 participants per cell, with 1,000 simulated studies per scenario and state. The request-slope scenario is also run at 100, 150, and 200 per cell, and with 96 requests per participant (72 safe, 24 unsafe) at 125. Each verdict is reached twice on the same data, once with participant-clustered errors and once with errors clustered on participants and requests (two-way). Monte Carlo standard errors are 0.6 to 1.5 points (`mcse_correct`, `mcse_correct_two_way`).
+Script 06 changes one assumption at a time at 125 participants per cell, with 1,000 simulated studies per scenario and state. The request-slope scenario is also run at 100, 150, and 200 per cell, and with 96 requests per participant (72 safe, 24 unsafe) at 125. Each verdict is reached three times on the same data: with participant-clustered errors, with analytic two-way errors, and with two-way errors using the request jackknife. The table shows the first and the last; all three are in `sensitivity_summary.csv`. Monte Carlo standard errors are 0.6 to 1.6 points (`mcse_correct`, `mcse_correct_two_way_jk`).
 
-| Scenario | Correct verdict, participant-clustered: cue / vigilance / neither | Correct verdict, two-way: cue / vigilance / neither | Lowest coverage: participant-clustered / two-way |
+| Scenario | Correct verdict, participant-clustered: cue / vigilance / neither | Correct verdict, two-way with jackknife: cue / vigilance / neither | Lowest coverage: participant-clustered / two-way with jackknife |
 |---|---|---|---|
-| Defaults | .93 / .95 / .94 | .89 / .93 / .88 | 94.0% / 87.5% |
-| Requests differ in tactic pull (SD 0.3) and in trained reviewers' reaction (SD 0.2), 100 per cell | .78 / .88 / .73 | .61 / .94 / .62 | 83.0% / 90.6% |
-| The same, 125 per cell | .81 / .85 / .78 | .67 / .92 / .69 | 80.9% / 90.0% |
-| The same, 150 per cell | .85 / .82 / .77 | .72 / .92 / .72 | 77.1% / 90.2% |
-| The same, 200 per cell | .82 / .81 / .76 | .76 / .92 / .77 | 72.4% / 89.9% |
-| The same, 125 per cell, 96 requests per participant | .91 / .85 / .85 | .92 / .93 / .90 | 78.9% / 91.7% |
-| Smaller cue effect, κ = 0.25 | .93 / – / – | .88 / – / – | 94.3% / 87.8% |
-| Vigilance gain at the SESOI, γ = 0.20 | – / .95 / – | – / .94 / – | 94.8% / 87.5% |
-| Sensitivity SDs of 0.5 for participants and requests | .86 / .95 / .84 | .86 / .92 / .84 | 94.1% / 86.4% |
-| σ = 1.5 | .89 / .96 / .88 | .85 / .94 / .85 | 94.4% / 89.2% |
-| σ = 1.0 (equal variances) | .95 / .96 / .95 | .90 / .94 / .89 | 94.2% / 85.5% |
-| Tactics pull unsafe requests no harder than safe ones (`pull_extra` = 0) | .94 / .95 / .95 | .88 / .93 / .90 | 94.1% / 87.5% |
-| Participants differ more in their tendency to reject, τ_c = 0.8 | .92 / .96 / .94 | .84 / .92 / .85 | 94.4% / 85.9% |
-| Requests differ more in how rejectable they look, ω_c = 0.6 | .92 / .97 / .92 | .87 / .93 / .85 | 91.9% / 87.1% |
+| Defaults | .93 / .95 / .94 | .89 / .93 / .89 | 94.4% / 91.6% |
+| Requests differ in tactic pull (SD 0.3) and in trained reviewers' reaction (SD 0.2), 100 per cell | .78 / .88 / .73 | .56 / .94 / .58 | 82.9% / 92.9% |
+| The same, 125 per cell | .81 / .85 / .78 | .63 / .93 / .65 | 80.8% / 92.1% |
+| The same, 150 per cell | .85 / .82 / .78 | .69 / .93 / .68 | 77.4% / 92.1% |
+| The same, 200 per cell | .82 / .81 / .76 | .74 / .92 / .75 | 72.4% / 91.8% |
+| The same, 125 per cell, 96 requests per participant | .91 / .85 / .85 | .93 / .93 / .91 | 78.7% / 92.9% |
+| Smaller cue effect, κ = 0.25 | .93 / – / – | .88 / – / – | 94.6% / 91.5% |
+| Vigilance gain at the SESOI, γ = 0.20 | – / .95 / – | – / .94 / – | 95.0% / 91.3% |
+| Sensitivity SDs of 0.5 for participants and requests | .86 / .95 / .84 | .85 / .93 / .84 | 94.1% / 90.4% |
+| σ = 1.5 | .89 / .96 / .89 | .84 / .95 / .84 | 94.5% / 92.5% |
+| σ = 1.0 (equal variances) | .95 / .96 / .95 | .91 / .94 / .91 | 94.4% / 89.3% |
+| Tactics pull unsafe requests no harder than safe ones (`pull_extra` = 0) | .94 / .95 / .95 | .90 / .93 / .91 | 94.4% / 91.1% |
+| Participants differ more in their tendency to reject, τ_c = 0.8 | .92 / .96 / .94 | .86 / .92 / .86 | 94.8% / 88.3% |
+| Requests differ more in how rejectable they look, ω_c = 0.6 | .93 / .97 / .92 | .89 / .93 / .87 | 91.9% / 90.9% |
 
-Dashes mark states the scenario doesn't change. The table comes from `sensitivity_summary.csv`; the request-slope sweep is also in `sensitivity_request_slopes_sweep.csv`, and coverage for each contrast is in `sensitivity_coverage_by_test.csv`. In the τ_c and ω_c scenarios the SESOI is converted with that scenario's own variances (0.152 and 0.158).
+Dashes mark states the scenario doesn't change. The request-slope sweep is also in `sensitivity_request_slopes_sweep.csv`, and coverage for each contrast is in `sensitivity_coverage_by_test.csv`. In the τ_c and ω_c scenarios the SESOI is converted with that scenario's own variances (0.152 and 0.158).
 
-Apart from request slopes, no single change lowered a participant-clustered correct-verdict rate by more than about 10 points. Larger sensitivity variances (cue .86, neither .84) and σ = 1.5 (cue .89, neither .88) hurt the cue and neither verdicts most. Removing the extra pull of tactics on unsafe requests changed nothing beyond Monte Carlo error. Larger criterion variances shrink the SESOI, but with the bound converted correctly the participant-clustered verdicts held at .92 or better; the two-way verdicts fell to .84 to .87.
+Apart from request slopes, no single change lowered a participant-clustered correct-verdict rate by more than about 10 points. Larger sensitivity variances (cue .86, neither .84) and σ = 1.5 (cue .89, neither .89) hurt the cue and neither verdicts most. Removing the extra pull of tactics on unsafe requests changed nothing beyond Monte Carlo error. Larger criterion variances shrink the SESOI, but with the bound converted correctly the participant-clustered verdicts held at .92 or better; with jackknifed two-way errors, the cue and neither verdicts fell to .86 to .89.
 
 The exception is variation between requests in how tactics and training affect them:
 
-- **Participant-clustered intervals undercovered**, and the contrasts that involve tactics did worst: T1, T2, and the tactic-laden T3 (`sensitivity_coverage_by_test.csv`). The worst contrast covered 83.0% at 100 per cell.
-- **Adding participants made coverage worse, not better**: 80.9% at 125, 77.1% at 150, and 72.4% at 200 per cell. Request-level variance doesn't shrink as participants are added, while the standard errors do.
-- **Two-way clustering held the worst contrast near 90%** (89.9% to 90.6%) at every sample size. But the wider intervals cost equivalence power: the cue and neither verdicts reached only .61 to .69 at 100 to 125 per cell, and .76 and .77 at 200.
-- **No sample size from 100 to 200 per cell, with 48 requests,** reached .80 correct verdicts in every state under either kind of clustering.
-- **Doubling the requests each participant reviews did.** With 96 requests at 125 per cell, the two-way verdicts were correct in .92, .93, and .90 of studies. Participant-clustered coverage stayed poor (78.9%), so the gain needs the two-way errors.
+- **Participant-clustered intervals undercovered**, and the contrasts that involve tactics did worst: T1, T2, and the tactic-laden T3 (`sensitivity_coverage_by_test.csv`). The worst contrast covered 82.9% at 100 per cell.
+- **Adding participants made coverage worse, not better**: 80.8% at 125, 77.4% at 150, and 72.4% at 200 per cell. Request-level variance doesn't shrink as participants are added, while the standard errors do.
+- **Two-way errors held up.** The worst contrast stayed at 91.8% to 92.9% with the request jackknife, and at 89.1% to 90.2% with analytic two-way errors, at every sample size (`sensitivity_request_slopes_sweep.csv`). But the wider intervals cost equivalence power: with the jackknife, the cue and neither verdicts reached only .56 to .65 at 100 to 125 per cell, and .74 and .75 at 200. Analytic two-way errors, being narrower, did a few points better (.61 to .68, then .76 and .77).
+- **No sample size from 100 to 200 per cell, with 48 requests,** reached .80 correct verdicts in every state under any of the three kinds of errors.
+- **Doubling the requests each participant reviews did.** With 96 requests at 125 per cell, the jackknifed two-way verdicts were correct in .93, .93, and .91 of studies. Participant-clustered coverage stayed poor (78.7%), so the gain needs two-way errors.
 
 So the remedy lies in the design and the primary model, not in the sample of people:
 
 - more requests per participant (tested here at 96), or a larger bank sampled per participant (not yet supported by the code);
 - random slopes by request for tactics and for training's effect on them, which the brms formula in script 05 includes.
 
-**Size of the equivalence tests.** When the true gain in *d* equals the SESOI, each T3 contrast should be declared equivalent in at most 5% of studies (`sensitivity_equivalence_at_sesoi.csv`; Monte Carlo SE 0.7 points). Participant-clustered errors gave 3.9% and 6.4%; two-way errors gave 7.4% and 8.5%, because their standard errors for T3 run small (section 2). With the wider bound from a pilot that put τ_c at 0.3, the rates rose to 7.3% and 8.9% with participant-clustered errors and to 11.0% and 12.6% with two-way errors. Using the 0.20 without conversion gave 13.4% to 20.7%.
+**Size of the equivalence tests.** When the true gain in *d* equals the SESOI, each T3 contrast should be declared equivalent in at most 5% of studies (`sensitivity_equivalence_at_sesoi.csv`; Monte Carlo SE 0.7 points). Participant-clustered errors gave 3.9% and 6.5% for the plain and tactic-laden contrasts; jackknifed two-way errors, 5.8% and 7.1%; analytic two-way errors, 7.3% and 8.2%. With the wider bound from a pilot that put τ_c at 0.3, the rates rose to 7.4% and 8.9% (participant-clustered), 9.1% and 10.6% (jackknife), and 10.6% and 11.6% (analytic two-way). Using the 0.20 without conversion gave 13.6% to 20.1%.
 
-**Which errors to preregister for the fast estimator.** Neither kind of clustering is right as it stands:
+**Which errors to preregister for the fast estimator.** Two-way errors with the request jackknife, in the model with the palter term:
 
 - Participant clustering is valid only if requests don't differ in how tactics and training affect them. A pilot with 48 requests can't rule that out, and the damage grows with the sample.
-- Two-way clustering fails in a bounded way. Its T1 to T3 errors run 3% to 12% small, so coverage is 87% to 93% and the equivalence tests pass a SESOI-sized gain about 8% of the time instead of 5%. It costs 1.7 to 5.9 points of correct verdicts under the defaults. And it inflates the T4 and T5 errors because the model leaves out paltering (section 2).
+- Jackknifed two-way errors held the worst contrast at 88% to 93% in every scenario, including request slopes, and kept the equivalence tests closest to their nominal size of any two-way version. They still fall short of 95%, because only 48 requests, 12 of them unsafe, inform the request part (section 2). A bias-reduced (CR2) sandwich with Satterthwaite degrees of freedom (Pustejovsky & Tipton, 2018), or a wild cluster bootstrap, might close the gap; neither is simulated here.
+- Under the defaults, they cost 1.6 to 5.3 points of correct verdicts against participant clustering at 125 per cell.
 
-I'd preregister two-way errors, because their failure doesn't grow with the sample, with two changes first: a palter-by-screen term in the model, and a small-sample correction for the request dimension that does better than *t* critical values (section 2), such as a bias-reduced (CR2) sandwich or a jackknife over requests. Neither is implemented or simulated here. The confirmatory test should stay with the brms model, which estimates the request slopes instead of clustering around them, and which needs no SESOI conversion.
+The confirmatory test should stay with the brms model, which estimates the request slopes instead of clustering around them and needs no SESOI conversion. The fast estimator is the planning tool and a robustness check.
 
-**Sample size.** Under the default assumptions, 125 per cell (750 participants) is the smallest size I'd preregister. With two-way errors it gave the correct verdict in at least 88% of studies in each state, and it is less exposed than 100 per cell to a pilot that misestimates τ_c (section 3). If the pilot can't rule out request slopes near 0.3 and 0.2, the study should use 96 requests per participant rather than more participants.
+**Sample size.** Under the default assumptions, 125 per cell (750 participants) is the smallest size I'd preregister. With jackknifed two-way errors it gave the correct verdict in at least 89% of studies in each state (`sensitivity_summary.csv`; .90, .90, .94, and 1.00 in `correct_verdict_rates.csv`), and it is less exposed than 100 per cell to a pilot that misestimates τ_c (section 3). If the pilot can't rule out request slopes near 0.3 and 0.2, the study should use 96 requests per participant rather than more participants.
 
 ### 5. Simulated reviewers
 
@@ -271,13 +272,13 @@ With 100 audits per point, the Wilson intervals in Figure 5 are still about ±8 
 # R 4.3 or later. Packages: ordinal, brms (with rstan), lme4, future.apply,
 # ggplot2, patchwork, here, testthat. renv.lock pins the versions of the full run.
 Rscript -e "renv::restore()"                 # install the pinned package versions
-Rscript tests/testthat.R                     # the test suite, about 15 seconds
+Rscript tests/testthat.R                     # the test suite, about 40 seconds
 Rscript run_all.R                            # tests plus scripts 01-06, quick mode
 SIM_FULL=1 SIM_WORKERS=31 Rscript run_all.R  # full mode; see the runtimes below
 RUN_BRMS_FULL=1 BRMS_TRUTH=cue Rscript scripts/05_brms_primary_model.R   # full-size primary model
 ```
 
-Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11), with 31 workers: tests 0.3 minutes; script 01, 0.6; script 02, 9.8; script 03, 7.3 (it runs on one core); script 04, 14.4. Script 06, with the 14 scenarios reported here, took 32.3 minutes on 27 workers while a brms fit used the other cores. Script 05's runtimes are in its section above.
+Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core); script 04, 14.4. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. The tests take about 40 seconds. Script 05's runtimes are in its section above.
 
 Environment variables:
 
@@ -291,13 +292,13 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 |---|---|
 | `R/design.R` | Parameters, the four true states, the latent mean and marginal SD, cells, and the contrast matrix |
 | `R/simulate.R` | Simulates one study; computes the exact population for pseudo-true values |
-| `R/analyze.R` | Pattern-level fit, analytic scores, cluster-robust covariance, tests, verdict, SESOI conversion |
+| `R/analyze.R` | Pattern-level fit, analytic scores, cluster-robust covariance (participant, two-way, and two-way with the request jackknife), tests, verdict, SESOI conversion |
 | `R/ppi.R` | Prediction-powered inference, PPI++, and simulated reviewers |
 | `R/audit.R` | Toy request bank, ridge classifier, grouped folds, permutation test |
 | `R/plots.R` | APA-style figures |
 | `scripts/01`–`06` | Recovery; power and adjudication; simulated reviewers; tell audit; primary model; sensitivity |
 | `scripts/05b` | Re-scores the saved full-size brms posteriors under a rule matched to the fast estimator's |
-| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, pseudo-true values, decision rule, PPI, AUC, folds |
+| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds |
 
 ## What this does not show
 
@@ -305,7 +306,8 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 - **The power analysis describes the fast estimator, not the preregistered Bayesian model.** Script 05 gives that model a decision rule and compares its verdict with the fast estimator's on the same data, but only once per run. Its error rates need repeated full-size fits. The two rules also differ: the Bayesian rule calls an effect when the 95% interval excludes zero, with no multiplicity correction, while the fast estimator uses one-sided tests at .05 with Holm's correction. Script 05b re-scores the saved posteriors under a matched rule, so that a disagreement can be traced to the model rather than the rule.
 - **The primary model leaves out two things the simulation allows.** It has no participant slope for tactics, so if people differ in susceptibility (script 03 sets that SD to 0.3; the power runs set it to 0), its T1 and T2 intervals would be too narrow. And it fits one request-intercept SD, while unsafe requests vary more than safe ones in the simulation. `(1 + unsafe + tactic | pid)` and separate request SDs for safe and unsafe requests (`gr(item, by = unsafe)` in brms) would match the simulation; neither has been fitted here.
 - **The SESOI conversion uses the true variance components.** In practice they would be estimated. Section 3 shows how much a misestimated τ_c moves the verdicts.
-- **The fast estimator leaves out which requests palter**, which inflates the two-way errors for the evidence contrasts (section 2).
+- **The primary model has no palter term.** The fast estimator now includes one; the brms formula still relies on request intercepts to absorb paltering's average cost, which can't capture that the evidence screen removes it. Its contrasts drop the palter weights.
+- **No version of the two-way errors reaches 95% coverage** with 48 requests (section 2). A bias-reduced sandwich (CR2) with Satterthwaite degrees of freedom (Pustejovsky & Tipton, 2018) or a wild cluster bootstrap would be the next things to try; neither is implemented here.
 - **The true states sit at the extremes** (κ of 0 or 0.5, γ of 0 or 0.3), apart from two sensitivity scenarios.
 - **The request-level problem isn't solved here.** Section 4 shows that it exists and that doubling the requests each participant reviews helps, but not how many requests are enough, and not a bank larger than any one participant sees, which the code doesn't yet support.
 - **The simulator's failure modes are settings, not measurements.** Their sizes would come from the registered simulated-reviewer predictions in the real study.
@@ -318,6 +320,8 @@ Angelopoulos, A. N., Bates, S., Fannjiang, C., Jordan, M. I., & Zrnic, T. (2023)
 Angelopoulos, A. N., Duchi, J. C., & Zrnic, T. (2024). *PPI++: Efficient prediction-powered inference* (Version 2) [Preprint]. arXiv. https://doi.org/10.48550/arXiv.2311.01453
 
 Bürkner, P.-C., & Vuorre, M. (2019). Ordinal regression models in psychology: A tutorial. *Advances in Methods and Practices in Psychological Science, 2*(1), 77–101. https://doi.org/10.1177/2515245918823199
+
+Cameron, A. C., Gelbach, J. B., & Miller, D. L. (2008). Bootstrap-based improvements for inference with clustered errors. *The Review of Economics and Statistics, 90*(3), 414–427. https://doi.org/10.1162/rest.90.3.414
 
 Cameron, A. C., Gelbach, J. B., & Miller, D. L. (2011). Robust inference with multiway clustering. *Journal of Business & Economic Statistics, 29*(2), 238–249. https://doi.org/10.1198/jbes.2010.07136
 
@@ -332,6 +336,8 @@ Lakens, D., Scheel, A. M., & Isager, P. M. (2018). Equivalence testing for psych
 Levy, J., Yang, M., & Pelrine, K. (2026). *AI persuasion as a threat to human control* (Version 2) [Preprint]. arXiv. https://doi.org/10.48550/arXiv.2609.14796
 
 Modirrousta-Galian, A., & Higham, P. A. (2023). Gamified inoculation interventions do not improve discrimination between true and fake news: Reanalyzing existing research with receiver operating characteristic analysis. *Journal of Experimental Psychology: General, 152*(9), 2411–2437. https://doi.org/10.1037/xge0001395
+
+Pustejovsky, J. E., & Tipton, E. (2018). Small-sample methods for cluster-robust variance estimation and hypothesis testing in fixed effects models. *Journal of Business & Economic Statistics, 36*(4), 672–683. https://doi.org/10.1080/07350015.2016.1247004
 
 Simchon, A., Zipori, T., Teitelbaum, L., Lewandowsky, S., & van der Linden, S. (2026). A signal detection theory meta-analysis of psychological inoculation against misinformation. *Current Opinion in Psychology, 67*, Article 102194. https://doi.org/10.1016/j.copsyc.2025.102194
 

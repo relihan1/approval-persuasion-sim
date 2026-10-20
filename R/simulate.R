@@ -92,7 +92,7 @@ population_grid <- function(pars) {
                      rating = rep(1:6, each = nrow(g)),
                      w = as.vector(probs) * rep(g$share, 6) / 2 / 6 / K)  # tactic, cell, trial weights
   long$block <- ceiling(long$trial / (K / 4))
-  pop <- stats::aggregate(w ~ unsafe + tactic + trained + screen + block + rating, data = long, FUN = sum)
+  pop <- stats::aggregate(w ~ unsafe + palter + tactic + trained + screen + block + rating, data = long, FUN = sum)
   pop$screen  <- factor(pop$screen, levels = screens)
   pop$block_c <- (pop$block - 2.5) * (K / 4) / K
   pop

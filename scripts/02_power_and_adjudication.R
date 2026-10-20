@@ -34,8 +34,9 @@ one_rep <- function(i) {
   res <- analyze_study(simulate_study(p, seed = cnd$seed), sesoi, sesoi_ev)
   uv <- res$tests; ev <- res$tests_ev
   data.frame(truth = cnd$truth, n_per_cell = cnd$n_per_cell, rep = cnd$rep, test = uv$test,
-             est = uv$est, se = uv$se, se_two_way = uv$se_two_way, se_model = uv$se_model,
-             sig = uv$sig, equiv = uv$equiv, verdict = res$verdict,
+             est = uv$est, se = uv$se, se_two_way = uv$se_two_way, se_two_way_jk = uv$se_two_way_jk,
+             se_model = uv$se_model, sig = uv$sig, equiv = uv$equiv, verdict = res$verdict,
+             verdict_two_way = res$verdict_two_way, verdict_two_way_jk = res$verdict_two_way_jk,
              ev_est = ev$est, ev_se = ev$se, ev_sig = ev$sig, ev_equiv = ev$equiv,
              verdict_ev = res$verdict_ev)
 }
@@ -62,7 +63,8 @@ power <- power[order(power$truth, power$test, power$n_per_cell), ]
 write.csv(power, out_path("tables", "power_by_test.csv"), row.names = FALSE)
 
 # ---- Adjudication ---------------------------------------------------------------
-studies <- unique(sims[, c("truth", "n_per_cell", "rep", "verdict", "verdict_ev")])
+studies <- unique(sims[, c("truth", "n_per_cell", "rep", "verdict", "verdict_two_way",
+                           "verdict_two_way_jk", "verdict_ev")])
 verdicts <- c("cue", "vigilance", "both", "null", "inconclusive")
 tab_verdicts <- function(col) {
   out <- do.call(rbind, lapply(split(studies, list(studies$truth, studies$n_per_cell)), function(s) {
@@ -74,32 +76,43 @@ tab_verdicts <- function(col) {
 }
 confusion_uv <- tab_verdicts("verdict")
 confusion_ev <- tab_verdicts("verdict_ev")
+confusion_jk <- tab_verdicts("verdict_two_way_jk")
 write.csv(confusion_uv, out_path("tables", "verdicts_unequal_variance.csv"), row.names = FALSE)
 write.csv(confusion_ev, out_path("tables", "verdicts_equal_variance.csv"), row.names = FALSE)
+write.csv(confusion_jk, out_path("tables", "verdicts_two_way_jackknife.csv"), row.names = FALSE)
 
-correct <- function(conf) {
+correct <- function(conf, name = "p_correct") {
   ok <- conf[conf$verdict == correct_verdict[conf$truth], c("truth", "n_per_cell", "share")]
-  names(ok)[3] <- "p_correct"
+  names(ok)[3] <- name
   ok
 }
-rates <- merge(correct(confusion_uv), setNames(correct(confusion_ev), c("truth", "n_per_cell", "p_correct_ev")))
+# p_correct: participant-clustered errors (the default); _two_way: analytic two-way;
+# _two_way_jk: two-way with the request jackknife; _ev: the binary equal-variance model.
+rates <- Reduce(merge, list(correct(confusion_uv), correct(confusion_ev, "p_correct_ev"),
+                            correct(tab_verdicts("verdict_two_way"), "p_correct_two_way"),
+                            correct(confusion_jk, "p_correct_two_way_jk")))
 rates$mcse <- sqrt(rates$p_correct * (1 - rates$p_correct) / R)
+rates$mcse_two_way_jk <- sqrt(rates$p_correct_two_way_jk * (1 - rates$p_correct_two_way_jk) / R)
 print(rates[order(rates$truth, rates$n_per_cell), ], digits = 3)
 write.csv(rates, out_path("tables", "correct_verdict_rates.csv"), row.names = FALSE)
 
 # Smallest sample size at which every true state gets the right verdict at least 80% of the time.
-ok_n <- sort(unique(rates$n_per_cell[ave(rates$p_correct, rates$n_per_cell, FUN = min) >= 0.80]))
+smallest_ok <- function(p) sort(unique(rates$n_per_cell[ave(p, rates$n_per_cell, FUN = min) >= 0.80]))
+ok_n <- smallest_ok(rates$p_correct)
 n_show <- if (length(ok_n)) min(ok_n) else max(n_grid)
-cat(sprintf("Smallest n per cell with >= .80 correct verdicts in every state: %s\n",
-            if (length(ok_n)) n_show else "none in the grid"))
+ok_jk <- smallest_ok(rates$p_correct_two_way_jk)
+cat(sprintf("Smallest n per cell with >= .80 correct verdicts in every state: %s (participant-clustered), %s (two-way, jackknife)\n",
+            if (length(ok_n)) n_show else "none in the grid", if (length(ok_jk)) min(ok_jk) else "none in the grid"))
 
 # ---- Estimator validity: coverage of 95% intervals --------------------------------
 sims$truth_value <- mapply(function(h, t) truth[[h]][[t]], sims$truth, sims$test)
 cover <- function(se) abs(sims$est - sims$truth_value) <= qnorm(0.975) * se
 coverage <- aggregate(cbind(pid = cover(sims$se), two_way = cover(sims$se_two_way),
+                            two_way_jk = cover(sims$se_two_way_jk),
                             model = cover(sims$se_model)) ~ truth + test, data = sims,
                       FUN = mean, na.rm = TRUE, na.action = na.pass)
 coverage$two_way_na <- aggregate(cbind(na = is.na(sims$se_two_way)) ~ truth + test, sims, sum)$na
+coverage$two_way_jk_na <- aggregate(cbind(na = is.na(sims$se_two_way_jk)) ~ truth + test, sims, sum)$na
 coverage$studies <- aggregate(k ~ truth + test, transform(sims, k = 1), sum)$k
 coverage$mcse_at_95 <- sqrt(0.95 * 0.05 / coverage$studies)  # Monte Carlo SE of a 95% coverage rate
 # SD of standardized errors should be near 1 when the standard errors are right.
@@ -115,8 +128,10 @@ coverage <- merge(coverage, aggregate(cbind(two_way_t = abs(sims$est - sims$trut
 # true state and sample size, then averaged over sample sizes (1 = right size).
 cal <- do.call(rbind, lapply(split(sims, list(sims$truth, sims$n_per_cell, sims$test), drop = TRUE), function(d)
   data.frame(truth = d$truth[1], test = d$test[1], se_ratio_pid = mean(d$se) / sd(d$est),
-             se_ratio_two_way = mean(d$se_two_way, na.rm = TRUE) / sd(d$est))))
-coverage <- merge(coverage, aggregate(cbind(se_ratio_pid, se_ratio_two_way) ~ truth + test, cal, mean))
+             se_ratio_two_way = mean(d$se_two_way, na.rm = TRUE) / sd(d$est),
+             se_ratio_two_way_jk = mean(d$se_two_way_jk, na.rm = TRUE) / sd(d$est))))
+coverage <- merge(coverage, aggregate(cbind(se_ratio_pid, se_ratio_two_way, se_ratio_two_way_jk) ~ truth + test,
+                                      cal, mean))
 print(coverage, digits = 3)
 write.csv(coverage, out_path("tables", "coverage_95.csv"), row.names = FALSE)
 

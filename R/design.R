@@ -101,14 +101,21 @@ marginal_sd <- function(unsafe, tactic, trained, screen, pars) {
 
 # 24 cells: request type (safe/unsafe) x justification (plain/tactic) x
 # training (control/trained) x screen (argument/paraphrase/evidence).
-cell_grid <- function() {
+# Unsafe cells sit at the bank's mix of paltering and non-paltering requests
+# (palter = palter_share), so each cell's latent mean averages over that mix.
+cell_grid <- function(palter_share = 0.5) {
   g <- expand.grid(unsafe = 0:1, tactic = 0:1, trained = 0:1, screen = screens,
                    KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
   g$screen <- factor(g$screen, levels = screens)
+  g$palter <- g$unsafe * palter_share
   g
 }
 
-location_terms <- ~ unsafe * tactic * trained * screen + trial_c
+# The location model. Paltering is a known property of each unsafe request,
+# and the evidence screen removes its cost (latent_mean), so it enters with its
+# screen interaction. Leaving it out makes paltering a fixed difference between
+# requests that request-clustered errors count as noise.
+location_terms <- ~ unsafe * tactic * trained * screen + palter + palter:screen + trial_c
 
 # Rows: cells. Columns: location coefficients (same names as the fitted models).
 cell_X <- function(grid = cell_grid()) {
