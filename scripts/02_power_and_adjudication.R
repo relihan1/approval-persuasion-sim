@@ -26,19 +26,31 @@ plan(multisession, workers = workers)
 conditions <- expand.grid(truth = names(hypotheses()), n_per_cell = n_grid, rep = seq_len(R),
                           stringsAsFactors = FALSE)
 conditions$seed <- seq_len(nrow(conditions)) + 1e6  # every study has its own seed
+# Small-sample options for the two-way errors: t on Satterthwaite df (_sw) and
+# the request score bootstrap (_boot, SIM_BOOT draws; 0 skips it).
+boot_draws <- as.integer(Sys.getenv("SIM_BOOT", 999))
 
 one_rep <- function(i) {
   cnd <- conditions[i, ]
   p <- with_hypothesis(pars, cnd$truth)
   p$n_per_cell <- cnd$n_per_cell
-  res <- analyze_study(simulate_study(p, seed = cnd$seed), sesoi, sesoi_ev)
+  res <- analyze_study(simulate_study(p, seed = cnd$seed), sesoi, sesoi_ev,
+                       satterthwaite = TRUE, boot_draws = boot_draws)
   uv <- res$tests; ev <- res$tests_ev
+  sw <- res$tests_two_way_sw; jk_sw <- res$tests_two_way_jk_sw
+  bt <- if (boot_draws > 0) res$tests_two_way_boot else transform(sw, lo95 = NA_real_, hi95 = NA_real_)
   data.frame(truth = cnd$truth, n_per_cell = cnd$n_per_cell, rep = cnd$rep, test = uv$test,
              est = uv$est, se = uv$se, se_two_way = uv$se_two_way, se_two_way_jk = uv$se_two_way_jk,
              se_model = uv$se_model, sig = uv$sig, equiv = uv$equiv, verdict = res$verdict,
              verdict_two_way = res$verdict_two_way, verdict_two_way_jk = res$verdict_two_way_jk,
              ev_est = ev$est, ev_se = ev$se, ev_sig = ev$sig, ev_equiv = ev$equiv,
-             verdict_ev = res$verdict_ev)
+             verdict_ev = res$verdict_ev,
+             df_two_way = uv$df_two_way, df_two_way_jk = uv$df_two_way_jk,
+             lo95_two_way_sw = sw$lo95, hi95_two_way_sw = sw$hi95,
+             lo95_two_way_jk_sw = jk_sw$lo95, hi95_two_way_jk_sw = jk_sw$hi95,
+             lo95_two_way_boot = bt$lo95, hi95_two_way_boot = bt$hi95,
+             verdict_two_way_sw = res$verdict_two_way_sw, verdict_two_way_jk_sw = res$verdict_two_way_jk_sw,
+             verdict_two_way_boot = if (boot_draws > 0) res$verdict_two_way_boot else NA_character_)
 }
 
 # SIM_REUSE=1 summarizes the saved simulations instead of rerunning them.
@@ -64,7 +76,8 @@ write.csv(power, out_path("tables", "power_by_test.csv"), row.names = FALSE)
 
 # ---- Adjudication ---------------------------------------------------------------
 studies <- unique(sims[, c("truth", "n_per_cell", "rep", "verdict", "verdict_two_way",
-                           "verdict_two_way_jk", "verdict_ev")])
+                           "verdict_two_way_jk", "verdict_ev", "verdict_two_way_sw",
+                           "verdict_two_way_jk_sw", "verdict_two_way_boot")])
 verdicts <- c("cue", "vigilance", "both", "null", "inconclusive")
 tab_verdicts <- function(col) {
   out <- do.call(rbind, lapply(split(studies, list(studies$truth, studies$n_per_cell)), function(s) {
@@ -87,12 +100,18 @@ correct <- function(conf, name = "p_correct") {
   ok
 }
 # p_correct: participant-clustered errors (the default); _two_way: analytic two-way;
-# _two_way_jk: two-way with the request jackknife; _ev: the binary equal-variance model.
+# _two_way_jk: two-way with the request jackknife; _ev: the binary equal-variance model;
+# _sw: t on Satterthwaite df; _boot: request score bootstrap (analytic two-way errors).
 rates <- Reduce(merge, list(correct(confusion_uv), correct(confusion_ev, "p_correct_ev"),
                             correct(tab_verdicts("verdict_two_way"), "p_correct_two_way"),
-                            correct(confusion_jk, "p_correct_two_way_jk")))
+                            correct(confusion_jk, "p_correct_two_way_jk"),
+                            correct(tab_verdicts("verdict_two_way_sw"), "p_correct_two_way_sw"),
+                            correct(tab_verdicts("verdict_two_way_jk_sw"), "p_correct_two_way_jk_sw"),
+                            correct(tab_verdicts("verdict_two_way_boot"), "p_correct_two_way_boot")))
 rates$mcse <- sqrt(rates$p_correct * (1 - rates$p_correct) / R)
 rates$mcse_two_way_jk <- sqrt(rates$p_correct_two_way_jk * (1 - rates$p_correct_two_way_jk) / R)
+rates$mcse_two_way_jk_sw <- sqrt(rates$p_correct_two_way_jk_sw * (1 - rates$p_correct_two_way_jk_sw) / R)
+rates$mcse_two_way_boot <- sqrt(rates$p_correct_two_way_boot * (1 - rates$p_correct_two_way_boot) / R)
 print(rates[order(rates$truth, rates$n_per_cell), ], digits = 3)
 write.csv(rates, out_path("tables", "correct_verdict_rates.csv"), row.names = FALSE)
 
@@ -103,6 +122,10 @@ n_show <- if (length(ok_n)) min(ok_n) else max(n_grid)
 ok_jk <- smallest_ok(rates$p_correct_two_way_jk)
 cat(sprintf("Smallest n per cell with >= .80 correct verdicts in every state: %s (participant-clustered), %s (two-way, jackknife)\n",
             if (length(ok_n)) n_show else "none in the grid", if (length(ok_jk)) min(ok_jk) else "none in the grid"))
+for (k in c("two_way_jk_sw", "two_way_boot")) {
+  ok_k <- smallest_ok(rates[[paste0("p_correct_", k)]])
+  cat(sprintf("  ... %s: %s\n", k, if (length(ok_k)) min(ok_k) else "none in the grid"))
+}
 
 # ---- Estimator validity: coverage of 95% intervals --------------------------------
 sims$truth_value <- mapply(function(h, t) truth[[h]][[t]], sims$truth, sims$test)
@@ -124,6 +147,15 @@ k_req <- pars$n_safe + pars$n_unsafe
 coverage <- merge(coverage, aggregate(cbind(two_way_t = abs(sims$est - sims$truth_value) <=
                                               qt(0.975, k_req - 1) * sims$se_two_way) ~ truth + test,
                                       data = sims, FUN = mean, na.rm = TRUE, na.action = na.pass))
+# Small-sample options: two-way errors with t on Satterthwaite df (_sw), the
+# same with the request jackknife (_jk_sw), and the request score bootstrap
+# (_boot), each from its own 95% interval; plus the median df.
+inside <- function(k) sims[[paste0("lo95_", k)]] <= sims$truth_value & sims$truth_value <= sims[[paste0("hi95_", k)]]
+coverage <- merge(coverage, aggregate(cbind(two_way_sw = inside("two_way_sw"), two_way_jk_sw = inside("two_way_jk_sw"),
+                                            two_way_boot = inside("two_way_boot")) ~ truth + test,
+                                      data = sims, FUN = mean, na.rm = TRUE, na.action = na.pass))
+coverage <- merge(coverage, aggregate(cbind(median_df_two_way = df_two_way, median_df_two_way_jk = df_two_way_jk) ~ truth + test,
+                                      data = sims, FUN = median, na.rm = TRUE, na.action = na.pass))
 # Calibration: mean standard error over the SD of the estimates, within each
 # true state and sample size, then averaged over sample sizes (1 = right size).
 cal <- do.call(rbind, lapply(split(sims, list(sims$truth, sims$n_per_cell, sims$test), drop = TRUE), function(d)
