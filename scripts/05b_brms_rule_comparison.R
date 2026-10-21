@@ -13,8 +13,9 @@
 #
 # It also re-derives the fast estimator's verdicts on the same simulated study
 # (script 05 uses seed 5) with the current estimator, under participant-
-# clustered errors and under two-way errors with the request jackknife, so the
-# comparison doesn't depend on which version of the estimator script 05 ran.
+# clustered errors, two-way errors with the request jackknife, and two-way
+# errors with the request score bootstrap (999 draws), so the comparison
+# doesn't depend on which version of the estimator script 05 ran.
 
 source(here::here("R", "load.R"))
 
@@ -29,10 +30,13 @@ rows <- lapply(files, function(f) {
   pc$sig <- stats::p.adjust(p_wrong, method = "holm", n = nrow(pc)) < 0.05
   cmp <- read.csv(here::here("output", "tables", sprintf("brms_vs_fast_full_%s.csv", truth)))
   pars <- with_hypothesis(dgm_defaults(), truth)
-  fast <- analyze_study(simulate_study(pars, seed = 5), sesoi_on_estimator_scale(pars), with_ev = FALSE)
+  dat <- simulate_study(pars, seed = 5)
+  set.seed(5)  # the bootstrap's draws
+  fast <- analyze_study(dat, sesoi_on_estimator_scale(pars), with_ev = FALSE, boot_draws = 999)
   data.frame(truth = truth, verdict_primary = cmp$verdict_primary,
              verdict_primary_holm = verdict(pc), verdict_fast_pid = fast$verdict_pid,
              verdict_fast_two_way_jk = fast$verdict_two_way_jk,
+             verdict_fast_two_way_boot = fast$verdict_two_way_boot,
              correct = correct_verdict[[truth]], max_rhat = cmp$max_rhat,
              min_ess_bulk = cmp$min_ess_bulk, min_ess_tail = cmp$min_ess_tail,
              # NA for fits made before script 05 checked every parameter class,

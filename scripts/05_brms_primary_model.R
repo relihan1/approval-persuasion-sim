@@ -16,8 +16,12 @@
 #   disc:     ~ 0 + unsafe. brms's disc is the inverse SD of the latent
 #             variable, fixed at 1 for safe requests, so exp(-b_disc_unsafe)
 #             is the SD of unsafe-request evidence (Bürkner & Vuorre, 2019).
-# The terms match latent_mean() in R/design.R one for one. Under the default
-# parameters three of the random-slope SDs are 0 (tau_t, omega_t, omega_k).
+# The fixed terms match latent_mean() in R/design.R one for one. The random
+# terms match too, with one difference: the simulation scales the participant
+# and request tactic slopes by the share of cues the paraphrase screen leaves
+# visible (cue_visible), while each slope here takes one value on every
+# screen. Under the default parameters those three slope SDs are 0 (tau_t,
+# omega_t, omega_k), so the difference only arises when slopes are present.
 #
 # Its estimates are on the participant-level scale, so the smallest effect of
 # interest is the preregistered 0.20 change in d, with no conversion.

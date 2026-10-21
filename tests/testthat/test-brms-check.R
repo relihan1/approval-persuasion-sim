@@ -17,24 +17,26 @@ test_that("parameters are classed by brms name, and internals are left out", {
 })
 
 test_that("a request SD that has not mixed fails the check, though every coefficient passes", {
+  L <- rbind(T1 = c(unsafe = 1, tactic = -1))
+  by_class <- function(d) convergence_by_class(d, contrast_draws(d, L))
   ok <- fake_draws()
   bad <- fake_draws(stuck = "sd_item__tactic")
   smp <- data.frame(chain = 1:4, divergent = 0, treedepth_hits = 0, ebfmi = 1)
-  cb_ok <- convergence_by_class(ok)
-  cb_bad <- convergence_by_class(bad)
+  cb_ok <- by_class(ok)
+  cb_bad <- by_class(bad)
   expect_true(convergence_ok(cb_ok, smp, n_chains = 4))
   expect_false(convergence_ok(cb_bad, smp, n_chains = 4))
   expect_lt(cb_bad$max_rhat[cb_bad$class == "b"], 1.01)  # the old b_-only check passes
   expect_identical(cb_bad$worst_rhat[cb_bad$class == "sd_item"], "sd_item__tactic")
   # Request and participant effects are summarised but not part of the rule.
-  expect_true(convergence_ok(convergence_by_class(fake_draws(stuck = "r_pid[1,Intercept]")),
+  expect_true(convergence_ok(by_class(fake_draws(stuck = "r_pid[1,Intercept]")),
                              smp, n_chains = 4))
   smp$divergent[2] <- 1
   expect_false(convergence_ok(cb_ok, smp, n_chains = 4))
 })
 
 test_that("the ESS floor covers what the verdict uses; R-hat covers every class", {
-  cb <- data.frame(class = c("b", "threshold", "disc", "sd_item", "cor_item", "contrast", "r_pid"),
+  cb <- data.frame(class = c("b", "threshold", "disc", "sd_pid", "sd_item", "cor_item", "contrast", "r_pid"),
                    max_rhat = 1.005, min_ess_bulk = 2000, min_ess_tail = 2000)
   smp <- data.frame(chain = 1:4, divergent = 0, treedepth_hits = 0, ebfmi = 1)
   with_row <- function(cls, col, value) { cb[cb$class == cls, col] <- value; cb }
@@ -47,6 +49,19 @@ test_that("the ESS floor covers what the verdict uses; R-hat covers every class"
   expect_true(convergence_ok(with_row("r_pid", "max_rhat", 1.05), smp, 4))
   smp$ebfmi[3] <- 0.2
   expect_false(convergence_ok(cb, smp, 4))
+})
+
+test_that("an NA diagnostic fails the check, and a missing class is an error", {
+  cb <- data.frame(class = c("b", "disc", "sd_pid", "sd_item", "contrast"),
+                   max_rhat = 1.005, min_ess_bulk = 2000, min_ess_tail = 2000)
+  smp <- data.frame(chain = 1:4, divergent = 0, treedepth_hits = 0, ebfmi = 1)
+  na_rhat <- cb
+  na_rhat$max_rhat[na_rhat$class == "b"] <- NA  # R-hat of a constant draw
+  expect_false(convergence_ok(na_rhat, smp, 4))
+  na_ess <- cb
+  na_ess$min_ess_tail[na_ess$class == "contrast"] <- NA
+  expect_false(convergence_ok(na_ess, smp, 4))
+  expect_error(convergence_ok(cb[cb$class != "sd_pid", ], smp, 4), "sd_pid")
 })
 
 test_that("coefficients that vary only between participants or only between requests have no weight in any contrast", {

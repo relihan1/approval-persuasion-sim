@@ -252,7 +252,12 @@ two_way_df <- function(H, C, v_total, v_req, jackknife = FALSE) {
 #   s*_k = v_g(k) s_k - h_k B S*,
 # h_k being review k's expected information. Then
 #   t* = c'B S* / sqrt(two-way variance of the s*_k),
-# with the small-sample factors of vcov_cluster(). Everything is linear in v,
+# with the small-sample factors of vcov_cluster(). In a linear model, where
+# h_k = x_k x_k' and B = (X'X)^-1, s*_k is exactly x_k times the bootstrap
+# residual, so this is the unrestricted wild cluster bootstrap (WCU) of
+# Roodman et al. (2019, pp. 10-11); here it is carried over to the ordinal
+# model through the expected information. B is clm's inverse observed
+# information, so the s*_k sum to zero only approximately. Everything is linear in v,
 # so the draws cost only matrix products. Returns contrasts x draws; draws
 # whose two-way variance is not positive are NA and are dropped, as boottest
 # does (p. 19). v: optional requests x draws matrix of weights, for tests.

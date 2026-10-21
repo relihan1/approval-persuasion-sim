@@ -72,21 +72,28 @@ sampler_summary <- function(np, max_treedepth = 10) {
 # The checks a fit has to pass before its verdict is reported:
 # - R-hat below 1.01 in every class except the individual participant and
 #   request effects (r_pid, r_item), which are summarised but not checked;
-# - bulk and tail ESS of at least 100 per chain for the contrasts, the SD of
-#   unsafe-request evidence (disc), and the random-effect SDs. The thresholds
-#   and the coefficients that differ only between participants (training,
-#   screen) or only between requests (unsafe, palter) mix slowest, because they
-#   trade off against the means of the random intercepts. They have no weight
-#   in any contrast (see test-brms-check.R), so their ESS is reported but not
-#   required;
+# - bulk and tail ESS of at least 100 per chain for the six contrasts, the SD
+#   of unsafe-request evidence (disc), and the random-effect SDs, which are
+#   what the verdict and the SESOI conversion use. The floor doesn't apply to
+#   the thresholds, the individual location coefficients (class b), or the
+#   random-effect correlations; their ESS is reported but not required. The
+#   contrasts are checked directly, so a coefficient's own ESS matters only
+#   through them. The slowest coefficients, those that differ only between
+#   participants (training, screen) or only between requests (unsafe, palter),
+#   trade off against the means of the random intercepts and have no weight in
+#   any contrast (see test-brms-check.R);
 # - no divergent transitions, and E-BFMI of at least 0.3 in every chain.
 ess_classes <- c("contrast", "disc", "sd_pid", "sd_item")
 
 convergence_ok <- function(by_class, sampler, n_chains) {
+  # A class missing from the table would otherwise pass its ESS floor unchecked.
+  missing <- setdiff(ess_classes, by_class$class)
+  if (length(missing)) stop("No draws for ", paste(missing, collapse = ", "), "; the ESS floor can't be checked.")
   checked <- by_class[!by_class$class %in% c("r_pid", "r_item"), ]
   ess_checked <- checked[checked$class %in% ess_classes, ]
-  all(checked$max_rhat < 1.01) &&
+  # isTRUE: an NA diagnostic (e.g. a constant draw) fails the check instead of returning NA.
+  isTRUE(all(checked$max_rhat < 1.01) &&
     all(ess_checked$min_ess_bulk >= 100 * n_chains) &&
     all(ess_checked$min_ess_tail >= 100 * n_chains) &&
-    sum(sampler$divergent) == 0 && all(sampler$ebfmi >= 0.3)
+    sum(sampler$divergent) == 0 && all(sampler$ebfmi >= 0.3))
 }

@@ -7,9 +7,9 @@ Branch `small-sample-request-inference`. The numbers come from full runs of scri
 Two options in `analyze_study()`, both off by default. With the defaults, every verdict, estimate, SE and p-value is unchanged. The full runs reproduced every existing column of every table that scripts 02 and 06 write, and the full simulation files, exactly. The only change is new columns.
 
 - **`satterthwaite = TRUE`**: the analytic and jackknifed two-way tests use *t* reference distributions, with degrees of freedom estimated for each contrast (verdicts `two_way_sw` and `two_way_jk_sw`). The request part's df follow Pustejovsky and Tipton's model-assisted Satterthwaite formula, ν = (Σ p_i′Φp_i)² / ΣΣ (p_i′Φp_j)² (eq. 11, p. 13). The working model has independent reviews and assumes the fitted model is right, so each request's summed scores have its expected information as covariance. The jackknife version uses the CR3 form, which "closely approximates the jackknife" (p. 8). The two-way df are ν_req (V / V_req)², because only the request part is noisy. Page numbers refer to the arXiv v2 (2022) copy in the library.
-- **`boot_draws > 0`**: a wild score bootstrap over requests, with Rademacher weights, for the analytic two-way *t* statistic (verdict `two_way_boot`; percentile-*t* intervals and p-values). Roodman et al. (2019) describe the score bootstrap for ML estimators (pp. 31–33). Their discussion of two-way clustering reports that bootstrapping in the dimension with fewer clusters works best (p. 20). They also warn that the plain score bootstrap uses bootstrap errors rather than residuals in the variance (pp. 32–33). So each draw here takes one Newton step and recentres the scores before the two-way variance is computed. That recentring is this code's own construction, not a published method. Draws with a non-positive two-way variance are dropped, as boottest does (p. 19).
+- **`boot_draws > 0`**: a wild score bootstrap over requests, with Rademacher weights, for the analytic two-way *t* statistic (verdict `two_way_boot`; percentile-*t* intervals and p-values). Roodman et al. (2019) describe the score bootstrap for ML estimators (pp. 31–33). Their discussion of two-way clustering reports that bootstrapping in the dimension with fewer clusters works best (p. 20). They also warn that the plain score bootstrap uses bootstrap errors rather than residuals in the variance (pp. 32–33). So each draw here takes one Newton step and recentres the scores before the two-way variance is computed. In a linear model the recentred scores are exactly the scores of the bootstrap residuals, so the procedure reduces to the unrestricted wild cluster bootstrap, WCU (pp. 10–11). Carrying it to an ordinal model through each review's expected information is this code's own step, not a published method. Roodman et al. prefer the restricted variant, WCR, in general (p. 13); WCU was used here because one set of draws gives intervals for all six contrasts. Draws with a non-positive two-way variance are dropped, as boottest does (p. 19).
 
-Tests (`tests/testthat/test-small-sample.R`, 49 expectations; the suite passes 106):
+Tests (`tests/testthat/test-small-sample.R`, 49 expectations; the full suite now passes 134):
 
 - The df formula matches the exact moments of the sandwich and jackknife variances in a Gaussian linear model to 1e-10.
 - Expected information matches the expected negative Hessian, computed by finite differences of the analytic scores.
@@ -53,7 +53,7 @@ Tests (`tests/testthat/test-small-sample.R`, 49 expectations; the suite passes 1
 **Why some contrasts still miss.**
 
 - **The df themselves are about right.** In `df_calibration.csv`, the predicted request-part df match 2·mean(V)²/var(V) across 250 studies per scenario for T1 (11 vs 9.5–12) and T3–T5 (14–16 vs 12.5–17).
-- **T2's df are too high once random effects are present** (35 vs 19–22). That leaves T2 at 94%.
+- **T2's df are too high once random effects are present.** The test uses the total df: 23.7 predicted against 12.9 empirical under the defaults, and 28.1 against 18.0 with request slopes. For the request part alone it is 35 against 19 to 22. With independent reviews the two agree (34.5 against 36.8). That leaves T2 at 94%.
 - **The jackknife SEs still run about 5% small** for T3–T5 (`se_ratio_two_way_jk`). *t* critical values fix heavy tails, not that bias.
 - **The bootstrap over-covers T4 and T5.**
 
@@ -85,7 +85,7 @@ Tests (`tests/testthat/test-small-sample.R`, 49 expectations; the suite passes 1
 
 **If one option is chosen, the bootstrap fits the preregistration's needs best.**
 
-- It is the only version whose T3 intervals and T3 equivalence tests are at nominal under the defaults.
+- It is the only version whose T3 intervals cover at the nominal 95% under the defaults (94.5–95.4). Its T3 equivalence tests are at or below 5% (3.8 and 4.9); jackknife + *t* comes close (4.6 and 5.4, the latter within Monte Carlo error of 5%), but its T3 intervals cover 94.0–94.5.
 - It costs no correct verdicts at 125 per cell.
 - Its weak spots are T2 (94.0%) and over-wide T4 and T5 intervals.
 
@@ -102,8 +102,9 @@ Jackknife + Satterthwaite *t* is the simpler choice, built on a published formul
 
 - **This is not a CR2 correction.** Satterthwaite df are applied to the existing jackknife and analytic sandwiches.
 - **The working-model df ignore random effects.** T2 shows the consequence.
-- **The recentred score bootstrap is unpublished as such.** Roodman et al. (p. 33) advise against relying on the score bootstrap without evidence that it works in the case at hand. These simulations are that evidence for this design and its assumed model only.
-- **The README's line that jackknife-type corrections should "err on the conservative side"** doesn't match its own coverage results (91–93%). It is left as is here.
+- **The recentred score bootstrap is unpublished as such.** It reduces to WCU in a linear model, but not exactly in this one. Roodman et al. (p. 33) advise against relying on the score bootstrap without evidence that it works in the case at hand. These simulations are that evidence for this design and its assumed model only.
+- **Rademacher weights.** Roodman et al. prefer Webb's six-point weights only below about 10 to 12 clusters (p. 15). With 48 requests, Rademacher weights allow 2^48 distinct draws. The df above put the request dimension's information at about 8 to 20 clusters, though, so six-point weights may be worth a check. They weren't tried.
+- **The README's line that jackknife-type corrections should "err on the conservative side"** didn't match its own coverage results (91–93%) and has since been removed.
 
 ## References
 
