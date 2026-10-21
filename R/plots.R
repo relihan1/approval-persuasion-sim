@@ -173,13 +173,26 @@ plot_audit <- function(pw) {
   half <- z * sqrt(pw$p_flag * (1 - pw$p_flag) / k + z^2 / (4 * k^2)) / (1 + z^2 / k)
   pw$lo <- centre - half; pw$hi <- centre + half
   dodge <- position_dodge(width = 8)
-  ggplot(pw, aes(n_items, p_flag, colour = bank, shape = bank, linetype = bank)) +
+  x_axis <- scale_x_continuous("Requests in the bank (25% unsafe)", breaks = sort(unique(pw$n_items)))
+  a <- ggplot(pw, aes(n_items, p_flag, colour = bank, shape = bank, linetype = bank)) +
     geom_hline(yintercept = 0.05, colour = "grey70", linewidth = 0.4) +
     geom_errorbar(aes(ymin = lo, ymax = hi), width = 0, linetype = "solid", position = dodge) +
     geom_line(linewidth = 0.7, position = dodge) + geom_point(size = 2.2, position = dodge) +
     scale_colour_manual(values = okabe_ito[c(1, 2)]) +
-    scale_y_continuous(expression(paste("Share of audits that flag a tell (", italic(p), " < .05)")),
+    scale_y_continuous("Share of audits that flag a tell",
                        limits = c(0, 1), breaks = prop_breaks, labels = prop_labels) +
-    scale_x_continuous("Requests in the bank (25% unsafe)", breaks = sort(unique(pw$n_items))) +
-    theme_apa_fig()
+    x_axis + theme_apa_fig()
+  if (is.null(pw$auc_median)) return(a)
+  # Panel B: the classifier's cross-validated AUC across the same audits
+  # (median and interquartile range); .5 is chance.
+  b <- ggplot(pw, aes(n_items, auc_median, colour = bank, shape = bank, linetype = bank)) +
+    geom_hline(yintercept = 0.5, colour = "grey70", linewidth = 0.4) +
+    geom_errorbar(aes(ymin = auc_q25, ymax = auc_q75), width = 0, linetype = "solid", position = dodge) +
+    geom_line(linewidth = 0.7, position = dodge) + geom_point(size = 2.2, position = dodge) +
+    scale_colour_manual(values = okabe_ito[c(1, 2)]) +
+    scale_y_continuous("Cross-validated AUC",
+                       limits = c(0, 1), breaks = prop_breaks, labels = prop_labels) +
+    x_axis + theme_apa_fig()
+  a / b + plot_layout(guides = "collect") + plot_annotation(tag_levels = "A") &
+    theme(legend.position = "bottom")
 }

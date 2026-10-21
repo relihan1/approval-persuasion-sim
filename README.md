@@ -266,18 +266,20 @@ For comparison, Krsteski et al. (2025) report effective-sample-size gains of up 
 
 ### 6. Tell audit
 
-The audit asks whether a ridge classifier, cross-validated by request, can tell unsafe from safe requests by the justification text alone. In the leaky bank, unsafe justifications include a minimizing phrase 70% of the time, against 30% for safe ones. In two example banks of 48 requests (12 unsafe; `tell_audit_examples.csv`):
+The audit asks whether a ridge classifier, cross-validated by request, can tell unsafe from safe requests by the justification text alone. In a leaky bank, each unsafe justification includes a minimizing phrase with probability .70, against .30 for safe ones.
 
-- the clean bank reached an AUC of .48 (permutation *p* = .516);
-- the leaky bank reached .37 (*p* = .838), so the audit missed a tell that was there.
+The two example banks are a matched pair of 48 requests (12 unsafe): they come from one seed, fixed in advance, and differ only in the leak (`tell_audit_examples.csv`). In the clean bank, 17% of unsafe and 22% of safe justifications minimized; in the leaky bank, 50% of unsafe ones did. The audit gave the clean bank an AUC of .52 (permutation *p* = .420) and the leaky bank .53 (*p* = .383). It missed a tell that was there.
 
-One example bank says little either way; the power of the audit is what matters. Over 100 audits per condition (`tell_audit_power.csv`), the audit flagged the leak in 23% of 48-request banks, 44% of 96-request banks, and 91% of 192-request banks. It flagged clean banks 2% to 8% of the time.
+One bank says little either way, so the audit was run 100 times per condition (`tell_audit_power.csv`):
 
-With 100 audits per point, the Wilson intervals in Figure 5 are still about ±8 to 10 points in the middle of the range. For this leak and this classifier, a bank of about 50 requests misses a real tell more often than not. A bank four times larger than the set any one participant sees caught it in 91% of audits. The audit should be reported with its power, and blind human raters remain a separate check.
+- **Power.** The audit flagged the leak in 19% of 48-request banks, 45% of 96-request banks, and 90% of 192-request banks. It flagged clean banks 2% to 5% of the time.
+- **AUC.** The classifier did pick up the leak on average: the median AUC for leaky banks was .61 at 48 requests (interquartile range .52 to .67) and .68 at 192 (.63 to .72). For clean banks the medians were .48 to .49. But single banks varied widely. At 48 requests, 21% of leaky banks and 59% of clean banks scored below .5.
+
+So at 48 requests the classifier usually sees the leak, but with 12 unsafe requests the permutation test can rarely confirm it. With 100 audits per point, the Wilson intervals in Figure 5A are still about ±8 to 10 points in the middle of the range. For this leak and this classifier, a bank of about 50 requests misses a real tell more often than not. A bank four times larger than the set any one participant sees caught it in 90% of audits. The audit should be reported with its power and the spread of its AUC, and blind human raters remain a separate check.
 
 ![Figure 5](output/figures/fig5_tell_audit_power.png)
 
-*Figure 5.* Share of tell audits (grouped cross-validated ridge logistic regression, permutation *p* < .05) that flag a tell, by bank size, with Wilson 95% intervals.
+*Figure 5.* (A) Share of tell audits (grouped cross-validated ridge logistic regression, permutation *p* < .05) that flag a tell, by bank size, with Wilson 95% intervals; the grey line marks .05. (B) The classifier's cross-validated AUC across the same audits, median and interquartile range; the grey line marks chance (.5).
 
 ## Running it
 
@@ -291,7 +293,7 @@ SIM_FULL=1 SIM_WORKERS=31 Rscript run_all.R  # full mode; see the runtimes below
 RUN_BRMS_FULL=1 BRMS_TRUTH=cue Rscript scripts/05_brms_primary_model.R   # full-size primary model
 ```
 
-Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core); script 04, 14.4. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. The tests take about 40 seconds. Script 05's runtimes are in its section above.
+Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core). Script 04 took 108 minutes on 8 workers while two other simulation jobs shared the machine. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. The tests take about 40 seconds. Script 05's runtimes are in its section above.
 
 Environment variables:
 
