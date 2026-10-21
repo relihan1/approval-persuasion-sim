@@ -34,7 +34,10 @@ rows <- lapply(files, function(f) {
              verdict_primary_holm = verdict(pc), verdict_fast_pid = fast$verdict_pid,
              verdict_fast_two_way_jk = fast$verdict_two_way_jk,
              correct = correct_verdict[[truth]], max_rhat = cmp$max_rhat,
-             min_ess_bulk = cmp$min_ess_bulk, min_ess_tail = cmp$min_ess_tail)
+             min_ess_bulk = cmp$min_ess_bulk, min_ess_tail = cmp$min_ess_tail,
+             # NA for fits made before script 05 checked every parameter class,
+             # whose R-hat and ESS cover the location coefficients only.
+             converged = if (is.null(cmp$converged)) NA else cmp$converged)
 })
 out <- do.call(rbind, rows)
 print(out, row.names = FALSE)
