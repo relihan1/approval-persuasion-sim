@@ -292,7 +292,9 @@ SIM_FULL=1 SIM_WORKERS=31 Rscript run_all.R  # full mode; see the runtimes below
 RUN_BRMS_FULL=1 BRMS_TRUTH=cue Rscript scripts/05_brms_primary_model.R   # full-size primary model
 ```
 
-Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core); script 04, 14.4. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. With the small-sample options added (999 bootstrap draws per study), scripts 02 and 06 were rerun on 16 workers while brms fits used other cores: 138.7 and 204.0 minutes. The tests take about 40 seconds. Script 05's runtimes are in its section above.
+Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core); script 04, 14.4. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. The tests take about 40 seconds. Script 05's runtimes are in its section above.
+
+With the small-sample options added (999 bootstrap draws per study), scripts 02 and 06 were rerun on 16 workers while brms fits used other cores: 138.7 and 204.0 minutes.
 
 Environment variables:
 
