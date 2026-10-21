@@ -15,8 +15,8 @@
 # Its estimates are on the participant-level scale, so the smallest effect of
 # interest is the preregistered 0.20 change in d, with no conversion.
 #
-# A full-size fit is expected to take hours (not timed here), which is why the
-# power analysis uses the fast population-averaged estimator. By default this
+# A full-size fit takes hours (README), which is why the power analysis uses
+# the fast population-averaged estimator. By default this
 # script fits a tiny study (72 participants, 24 requests) only to check that the
 # model compiles, samples, and returns the contrasts; it is far too small to
 # recover them.
@@ -49,12 +49,14 @@ posterior_contrasts <- function(fit, L = contrast_L(), sesoi = 0.20) {
   # This formula has no palter terms (the fast estimator's does); their contrast
   # weights drop out, and the request intercepts absorb paltering's average cost.
   L <- drop_absent_terms(L, sub("^b_", "", brms::variables(fit)))
-  draws <- as.matrix(fit, variable = paste0("b_", colnames(L)))[, paste0("b_", colnames(L))]
-  est <- draws %*% t(L)
+  cd <- contrast_draws(fit, L)  # keeps the chains, for R-hat and ESS of each contrast
+  est <- posterior::as_draws_matrix(cd)
   q <- function(p) apply(est, 2, stats::quantile, p)
+  conv <- posterior::summarise_draws(cd, "rhat", "ess_bulk", "ess_tail")
   out <- data.frame(test = colnames(est), median = apply(est, 2, stats::median),
                     lo95 = q(0.025), hi95 = q(0.975), lo90 = q(0.05), hi90 = q(0.95),
                     p_positive = colMeans(est > 0), p_inside_sesoi = colMeans(abs(est) < sesoi),
+                    rhat = conv$rhat, ess_bulk = conv$ess_bulk, ess_tail = conv$ess_tail,
                     row.names = NULL)
   dir <- attr(L, "direction")[out$test]
   out$sig <- ifelse(dir == "greater", out$lo95 > 0, out$hi95 < 0)
@@ -69,21 +71,54 @@ if (!full) pars <- utils::modifyList(pars, list(n_per_cell = 12, n_safe = 18, n_
 
 dat <- simulate_study(pars, seed = 5)
 cat(sprintf("Fitting %d reviews from %d participants\n", nrow(dat), length(unique(dat$pid))))
+tag <- sprintf("%s_%s", if (full) "full" else "tiny", truth)
 
+# Starting values: rstan's default draws every unconstrained parameter from
+# (-2, 2). brms writes the cumulative-probit likelihood as log(Phi - Phi) for
+# each review, which underflows to log(0) when a linear predictor lands far
+# from the thresholds, so only about 1% of those draws have a finite log
+# density at full size, and a chain that finds none in 100 tries is dropped.
+# From (-0.5, 0.5), about 70% do. Starting values don't change the posterior.
+# Iterations: a warmup iteration costs about 105 gradient evaluations and a
+# sampling iteration about 63, so 2,000 sampling iterations per chain instead
+# of 1,000 add about 37% to the run time. At a third of full size, 1,000 left
+# one coefficient at R-hat 1.012, and the earlier full-size fits (4 x 1,000
+# draws) reached bulk ESS of only 139 to 276 for the location coefficients.
+# BRMS_THREADS > 1 splits each chain's likelihood across that many threads
+# (within-chain parallelism, rstan >= 2.26); it changes run time, not the
+# model, but the draws differ from an unthreaded run with the same seed.
+threads <- as.integer(Sys.getenv("BRMS_THREADS", "1"))
 fit <- brm(primary_formula, data = dat, family = cumulative(link = "probit"),
            prior = primary_priors, backend = "rstan",
-           chains = if (full) 4 else 2, iter = if (full) 2000 else 1000,
+           chains = if (full) 4 else 2, iter = if (full) 3000 else 1000,
+           warmup = if (full) 1000 else 500, init_r = 0.5,
            cores = min(4, future::availableCores()), seed = 20261019,
+           threads = if (threads > 1) threading(threads) else NULL,
            control = list(adapt_delta = 0.9), refresh = 0)
+# Saved so that its diagnostics can be revisited without refitting
+# (output/fits/ is not under version control).
+saveRDS(fit, out_path("fits", sprintf("brms_%s.rds", tag)))
 
 pc <- posterior_contrasts(fit)
 print(pc, digits = 3)
 
-# Convergence diagnostics for the location and disc coefficients.
-dg <- posterior::summarise_draws(posterior::subset_draws(posterior::as_draws_df(fit), variable = "^b_",
-                                                         regex = TRUE), "rhat", "ess_bulk", "ess_tail")
-diagnostics <- data.frame(max_rhat = max(dg$rhat), min_ess_bulk = min(dg$ess_bulk),
-                          min_ess_tail = min(dg$ess_tail))
+# Convergence diagnostics for every parameter class and the six contrasts
+# (R/brms_check.R), and the sampler's own warnings.
+L_fit <- drop_absent_terms(contrast_L(), sub("^b_", "", brms::variables(fit)))
+by_class <- convergence_by_class(posterior::as_draws_array(fit), contrast_draws(fit, L_fit))
+sampler <- sampler_summary(brms::nuts_params(fit), max_treedepth = 10)
+print(by_class, digits = 3)
+print(sampler, digits = 3)
+checked <- by_class[!by_class$class %in% c("r_pid", "r_item"), ]
+ess_checked <- checked[checked$class %in% ess_classes, ]
+diagnostics <- data.frame(
+  n_chains = posterior::nchains(fit),
+  max_rhat = max(checked$max_rhat), worst_rhat = checked$worst_rhat[which.max(checked$max_rhat)],
+  min_ess_bulk = min(ess_checked$min_ess_bulk), min_ess_tail = min(ess_checked$min_ess_tail),
+  min_ess_bulk_other = min(checked$min_ess_bulk[!checked$class %in% ess_classes]),
+  divergent = sum(sampler$divergent), treedepth_hits = sum(sampler$treedepth_hits),
+  min_ebfmi = min(sampler$ebfmi),
+  converged = convergence_ok(by_class, sampler, n_chains = posterior::nchains(fit)))
 print(diagnostics)
 
 # The fast estimator's verdict on the same data, for comparison.
@@ -94,7 +129,7 @@ print(comparison)
 sd_unsafe <- exp(-as.matrix(fit, variable = "b_disc_unsafe"))
 cat(sprintf("SD of unsafe-request evidence: median %.2f (generating value %.2f)\n",
             median(sd_unsafe), pars$sigma_unsafe))
-tag <- sprintf("%s_%s", if (full) "full" else "tiny", truth)
 write.csv(pc, out_path("tables", sprintf("brms_contrasts_%s.csv", tag)), row.names = FALSE)
 write.csv(comparison, out_path("tables", sprintf("brms_vs_fast_%s.csv", tag)), row.names = FALSE)
+write.csv(by_class, out_path("tables", sprintf("brms_convergence_%s.csv", tag)), row.names = FALSE)
 writeLines(capture.output(sessionInfo()), out_path("sessionInfo_05.txt"))

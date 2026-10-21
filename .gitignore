@@ -3,3 +3,4 @@
 .RData
 renv/library/
 renv/staging/
+output/fits/

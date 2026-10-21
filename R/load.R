@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
 
 options(contrasts = c("contr.treatment", "contr.poly"))  # coefficient names depend on this
 
-for (f in c("design.R", "simulate.R", "analyze.R", "ppi.R", "audit.R", "plots.R")) {
+for (f in c("design.R", "simulate.R", "analyze.R", "ppi.R", "audit.R", "plots.R", "brms_check.R")) {
   path <- here::here("R", f)
   if (file.exists(path)) source(path)
 }

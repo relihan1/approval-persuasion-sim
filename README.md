@@ -103,6 +103,13 @@ R-hat and ESS are for the location coefficients. The primary model reached the r
 
 These fits need more work before their intervals can be trusted to the second decimal: Stan warned of low bulk and tail effective sample sizes in every fit, and the largest R-hat was above 1.01 in three of the four. And one fit per state says nothing about the primary model's error rates. At 3.5 hours or more per fit, the 100 fits that 25 per state would need are out of reach on one workstation.
 
+A diagnosis at a third of full size (50 participants per cell, the same 48 requests, cue state) found two problems and changed script 05 accordingly; the table above comes from the earlier settings, and the full-size fits have not been rerun:
+
+- **Starting values.** brms computes each review's likelihood as log(Φ(*a*) − Φ(*b*)), which underflows to log(0) when a linear predictor lands far from the thresholds. Of 200 starting points drawn the default way (every unconstrained parameter uniform on −2 to 2), 2 had a finite log density at full size. Stan tries 100 per chain and drops a chain that finds none: at a third of full size, two of the four chains were dropped and brms returned the other two with only a warning. Reproducing the four full-size fits' starting values (same data and seeds) shows that all their chains started, but chain 3 started at a log density near −250,000, against −120,000 to −135,000 for the others; the fits weren't saved, so whether that was the chain that ran long can't be checked. Script 05 now draws starting values from −0.5 to 0.5 (`init_r = 0.5`), where 141 of 200 were finite, and saves each fit to `output/fits/` (not under version control).
+- **What mixes slowly.** With all four chains started, there were no divergent transitions, no iterations at the tree-depth limit, and E-BFMI was 0.62 to 0.69. The slowest parameters were the thresholds (bulk ESS 711 of 4,000 draws) and the coefficients that vary only between participants or only between requests (training, screen, unsafe; 829 or more, and an R-hat of 1.012 for training × evidence screen). These trade off against the means of the random intercepts and have no weight in any contrast. The six contrasts had R-hat of 1.001 or less and bulk ESS of 2,673 or more. The request-slope SDs, whose true value is 0, mixed well (bulk ESS above 2,200), so tighter priors on them, or dropping their correlations, have nothing to fix; dropping the correlations left the cost per draw unchanged.
+
+Script 05 now checks R-hat (below 1.01) for every parameter class except the individual participant and request effects, and ESS for the contrasts, the SD of unsafe-request evidence, and the random-effect SDs (at least 400 from four chains; Vehtari et al., 2021), and records divergences and E-BFMI (`R/brms_check.R`, `brms_convergence_*.csv`, and a `converged` column). A full-size fit now runs 2,000 sampling iterations per chain after 1,000 of warmup, because the earlier full-size fits reached bulk ESS of only 139 to 276 for the location coefficients from 4 × 1,000 draws. A warmup iteration cost about 105 gradient evaluations and a sampling iteration about 63, so this adds about 37% to the run time: about 4.75 hours on four otherwise idle cores, scaled from the 208 minutes above. Setting `BRMS_THREADS` splits each chain across several threads, which shortens a single fit when cores are free but doesn't raise throughput for a batch.
+
 ### Fast estimator for the power analysis
 
 `R/analyze.R` fits the same unequal-variance ordinal probit model without random effects (`ordinal::clm` with a scale term). It adds a palter-by-screen term, because which unsafe requests palter is known from the stimulus bank and the evidence screen removes paltering's cost. Each design cell's mean averages over the bank's mix of paltering and non-paltering requests. Five points about it:
@@ -297,7 +304,7 @@ Environment variables:
 
 - `SIM_R` and `SIM_R6` set the number of studies per condition in scripts 02 and 06.
 - `SIM_REUSE=1` summarizes saved simulations without rerunning them (scripts 02 and 06).
-- `BRMS_TRUTH` sets the true state for script 05. After full-size fits, `Rscript scripts/05b_brms_rule_comparison.R` re-scores them under the matched rule.
+- `BRMS_TRUTH` sets the true state for script 05, and `BRMS_THREADS` the threads per chain (default 1). After full-size fits, `Rscript scripts/05b_brms_rule_comparison.R` re-scores them under the matched rule.
 
 On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries pinned here (rstan 2.32.7 with StanHeaders 2.39.1), rstan's compiler plugin adds `-std=c++1y`, which overrides the C++17 standard StanHeaders needs, and every model fails to compile. Point `R_MAKEVARS_USER` at a file containing `CXX17FLAGS += -std=gnu++17` before running script 05.
 
@@ -309,9 +316,10 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 | `R/ppi.R` | Prediction-powered inference, PPI++, and simulated reviewers |
 | `R/audit.R` | Toy request bank, ridge classifier, grouped folds, permutation test |
 | `R/plots.R` | APA-style figures |
+| `R/brms_check.R` | Convergence checks for the primary model: R-hat and ESS by parameter class and for the contrasts, sampler diagnostics, and the pass rule |
 | `scripts/01`–`06` | Recovery; power and adjudication; simulated reviewers; tell audit; primary model; sensitivity |
 | `scripts/05b` | Re-scores the saved full-size brms posteriors under a rule matched to the fast estimator's |
-| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds |
+| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds, the primary model's convergence rule |
 
 ## What this does not show
 
@@ -353,6 +361,8 @@ Modirrousta-Galian, A., & Higham, P. A. (2023). Gamified inoculation interventio
 Pustejovsky, J. E., & Tipton, E. (2018). Small-sample methods for cluster-robust variance estimation and hypothesis testing in fixed effects models. *Journal of Business & Economic Statistics, 36*(4), 672–683. https://doi.org/10.1080/07350015.2016.1247004
 
 Simchon, A., Zipori, T., Teitelbaum, L., Lewandowsky, S., & van der Linden, S. (2026). A signal detection theory meta-analysis of psychological inoculation against misinformation. *Current Opinion in Psychology, 67*, Article 102194. https://doi.org/10.1016/j.copsyc.2025.102194
+
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B., & Bürkner, P.-C. (2021). Rank-normalization, folding, and localization: An improved R̂ for assessing convergence of MCMC (with discussion). *Bayesian Analysis, 16*(2), 667–718. https://doi.org/10.1214/20-BA1221
 
 ## Software
 
