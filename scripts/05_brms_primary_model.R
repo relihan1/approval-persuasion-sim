@@ -87,13 +87,11 @@ tag <- sprintf("%s_%s", if (full) "full" else "tiny", truth)
 # from the thresholds, so only about 1% of those draws have a finite log
 # density at full size, and a chain that finds none in 100 tries is dropped.
 # From (-0.5, 0.5), about 70% do. Starting values don't change the posterior.
-# Iterations: at a third of full size, a warmup iteration cost about 135
-# gradient evaluations and a sampling iteration about 95, so 2,000 sampling
-# iterations per chain instead of 1,000 add about 40% to the run time. With
-# 1,000, the SD of participants' susceptibility to tactics (0 in the
-# simulation) reached bulk ESS of only 237 from four chains, and the earlier
-# full-size fits of the smaller formula reached only 139 to 276 for the
-# location coefficients.
+# Iterations: in a full-size fit (vigilance state), a warmup iteration cost
+# about 215 gradient evaluations and a sampling iteration 127, so 2,000
+# sampling iterations per chain instead of 1,000 add about 37% to the run
+# time. That fit passed the convergence rule with 2,000 (largest R-hat 1.0096)
+# but would have failed with its first 1,000 (R-hat 1.023).
 # BRMS_THREADS > 1 splits each chain's likelihood across that many threads
 # (within-chain parallelism, rstan >= 2.26); it changes run time, not the
 # model, but the draws differ from an unthreaded run with the same seed.
