@@ -1,2 +1,2 @@
 "truth","full_size","verdict_primary","verdict_fast","n_chains","max_rhat","worst_rhat","min_ess_bulk","min_ess_tail","min_ess_bulk_other","divergent","treedepth_hits","min_ebfmi","converged"
-"cue",FALSE,"inconclusive","inconclusive",2,1.0144841354791,"b_unsafe",237.711844259966,256.294639333417,201.848253894187,0,0,0.772383413713121,FALSE
+"cue",FALSE,"inconclusive","inconclusive",2,1.01142130290368,"sd_pid__unsafe",214.207163420675,285.159493216152,334.280260967421,0,0,0.818406194880029,FALSE

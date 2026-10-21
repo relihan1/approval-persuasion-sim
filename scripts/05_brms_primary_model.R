@@ -4,13 +4,20 @@
 #
 #   rating ~ cumulative probit
 #   location: unsafe x tactic x trained x screen + trial position
-#             + participant criterion and sensitivity, (1 + unsafe | pid)
+#             + paltering and the evidence screen's removal of its cost,
+#               palter + palter:screen (the fast estimator's terms)
+#             + participant criterion, sensitivity, and susceptibility to
+#               tactics, (1 + unsafe + tactic | pid)
 #             + request location, tactic effect, and trained reaction to
 #               tactics, (1 + tactic + tactic:trained | item); script 06 shows
 #               why the request slopes matter
+#             + the extra spread of unsafe requests, (0 + unsafe | item),
+#               uncorrelated with the request location as in the simulation
 #   disc:     ~ 0 + unsafe. brms's disc is the inverse SD of the latent
 #             variable, fixed at 1 for safe requests, so exp(-b_disc_unsafe)
 #             is the SD of unsafe-request evidence (Bürkner & Vuorre, 2019).
+# The terms match latent_mean() in R/design.R one for one. Under the default
+# parameters three of the random-slope SDs are 0 (tau_t, omega_t, omega_k).
 #
 # Its estimates are on the participant-level scale, so the smallest effect of
 # interest is the preregistered 0.20 change in d, with no conversion.
@@ -27,8 +34,8 @@ source(here::here("R", "load.R"))
 suppressPackageStartupMessages(library(brms))
 
 primary_formula <- bf(
-  rating ~ unsafe * tactic * trained * screen + trial_c + (1 + unsafe | pid) +
-    (1 + tactic + tactic:trained | item)
+  rating ~ unsafe * tactic * trained * screen + palter + palter:screen + trial_c +
+    (1 + unsafe + tactic | pid) + (1 + tactic + tactic:trained | item) + (0 + unsafe | item)
 ) + lf(disc ~ 0 + unsafe, cmc = FALSE)
 
 primary_priors <- c(
@@ -46,8 +53,9 @@ primary_priors <- c(
 # alpha = .05. The same verdict() then applies. This rule has no multiplicity
 # correction; its error rates have to be checked by repeated full-size fits.
 posterior_contrasts <- function(fit, L = contrast_L(), sesoi = 0.20) {
-  # This formula has no palter terms (the fast estimator's does); their contrast
-  # weights drop out, and the request intercepts absorb paltering's average cost.
+  # The formula has the palter terms, so every contrast weight is used and the
+  # contrasts match the fast estimator's. drop_absent_terms() drops nothing
+  # here; it would stop if a term other than a palter term were missing.
   L <- drop_absent_terms(L, sub("^b_", "", brms::variables(fit)))
   cd <- contrast_draws(fit, L)  # keeps the chains, for R-hat and ESS of each contrast
   est <- posterior::as_draws_matrix(cd)
@@ -79,11 +87,13 @@ tag <- sprintf("%s_%s", if (full) "full" else "tiny", truth)
 # from the thresholds, so only about 1% of those draws have a finite log
 # density at full size, and a chain that finds none in 100 tries is dropped.
 # From (-0.5, 0.5), about 70% do. Starting values don't change the posterior.
-# Iterations: a warmup iteration costs about 105 gradient evaluations and a
-# sampling iteration about 63, so 2,000 sampling iterations per chain instead
-# of 1,000 add about 37% to the run time. At a third of full size, 1,000 left
-# one coefficient at R-hat 1.012, and the earlier full-size fits (4 x 1,000
-# draws) reached bulk ESS of only 139 to 276 for the location coefficients.
+# Iterations: at a third of full size, a warmup iteration cost about 135
+# gradient evaluations and a sampling iteration about 95, so 2,000 sampling
+# iterations per chain instead of 1,000 add about 40% to the run time. With
+# 1,000, the SD of participants' susceptibility to tactics (0 in the
+# simulation) reached bulk ESS of only 237 from four chains, and the earlier
+# full-size fits of the smaller formula reached only 139 to 276 for the
+# location coefficients.
 # BRMS_THREADS > 1 splits each chain's likelihood across that many threads
 # (within-chain parallelism, rstan >= 2.26); it changes run time, not the
 # model, but the draws differ from an unthreaded run with the same seed.
