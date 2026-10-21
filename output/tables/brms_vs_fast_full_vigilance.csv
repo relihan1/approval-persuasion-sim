@@ -1,2 +1,2 @@
-"truth","full_size","verdict_primary","verdict_fast","max_rhat","min_ess_bulk","min_ess_tail"
-"vigilance",TRUE,"vigilance","vigilance",1.03765453846619,138.576648093914,348.36817366488
+"truth","full_size","verdict_primary","verdict_fast","n_chains","max_rhat","worst_rhat","min_ess_bulk","min_ess_tail","min_ess_bulk_other","divergent","treedepth_hits","min_ebfmi","converged"
+"vigilance",TRUE,"vigilance","vigilance",4,1.00956044577581,"sd_item__Intercept",861.355784039948,960.154304296244,540.096983209771,0,0,0.698809753801548,TRUE
