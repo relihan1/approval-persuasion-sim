@@ -105,11 +105,12 @@ These fits need more work before their intervals can be trusted to the second de
 
 ### Fast estimator for the power analysis
 
-`R/analyze.R` fits the same unequal-variance ordinal probit model without random effects (`ordinal::clm` with a scale term). It adds a palter-by-screen term, because which unsafe requests palter is known from the stimulus bank and the evidence screen removes paltering's cost. Each design cell's mean averages over the bank's mix of paltering and non-paltering requests. Five points about it:
+`R/analyze.R` fits the same unequal-variance ordinal probit model without random effects (`ordinal::clm` with a scale term). It adds a palter-by-screen term, because which unsafe requests palter is known from the stimulus bank and the evidence screen removes paltering's cost. Each design cell's mean averages over the bank's mix of paltering and non-paltering requests. Six points about it:
 
 - It fits frequency-weighted response patterns, which reproduces the row-level fit to within about 2 × 10⁻¹⁵ (`estimator_checks.csv`) and takes a fraction of a second.
 - Standard errors come from cluster-robust sandwiches built from analytic score contributions, which the tests check against numerical derivatives. The default clusters on participants.
 - Two alternatives cluster on requests as well. The analytic two-way version adds the participant- and request-clustered parts and subtracts the observation-level part (Cameron et al., 2011). The jackknifed version replaces the request-clustered part with the delete-one-request jackknife, which refits the model 48 times per study (Cameron et al., 2008). Jackknife-type corrections tend to over-correct the downward bias of cluster-robust errors (Pustejovsky & Tipton, 2018), so it should err on the conservative side.
+- Two small-sample options for the two-way errors are off by default: *t* reference distributions with Satterthwaite degrees of freedom for each contrast (`satterthwaite = TRUE`; Pustejovsky & Tipton, 2018), and a wild score bootstrap over requests (`boot_draws`; Roodman et al., 2019). Scripts 02 and 06 record both; the results are in `notes/small_sample_request_inference.md`.
 - It targets population-averaged parameters, which are smaller than participant-level ones.
 - To compare like with like, the code computes its exact pseudo-true values: it integrates the random effects analytically and fits the estimator to the expected rating frequencies.
 
@@ -242,7 +243,7 @@ So the remedy lies in the design and the primary model, not in the sample of peo
 **Which errors to preregister for the fast estimator.** Two-way errors with the request jackknife, in the model with the palter term:
 
 - Participant clustering is valid only if requests don't differ in how tactics and training affect them. A pilot with 48 requests can't rule that out, and the damage grows with the sample.
-- Jackknifed two-way errors held the worst contrast at 88% to 93% in every scenario, including request slopes, and kept the equivalence tests closest to their nominal size of any two-way version. They still fall short of 95%, because only 48 requests, 12 of them unsafe, inform the request part (section 2). A bias-reduced (CR2) sandwich with Satterthwaite degrees of freedom (Pustejovsky & Tipton, 2018), or a wild cluster bootstrap, might close the gap; neither is simulated here.
+- Jackknifed two-way errors held the worst contrast at 88% to 93% in every scenario, including request slopes, and kept the equivalence tests closest to their nominal size of any two-way version. They still fall short of 95%, because only 48 requests, 12 of them unsafe, inform the request part (section 2). Satterthwaite degrees of freedom (Pustejovsky & Tipton, 2018) and a wild score bootstrap over requests are now options. In the full runs, the bootstrap brought T1 and both T3 contrasts to 94.7% to 95.2% under the defaults and held the T3 equivalence tests at 3.8% and 4.9%. It left T2 at 94.0%, and its worst contrast across scenarios at 92.9% to 94.8% (`notes/small_sample_request_inference.md`).
 - Under the defaults, they cost 1.6 to 5.3 points of correct verdicts against participant clustering at 125 per cell.
 
 The confirmatory test should stay with the brms model, which estimates the request slopes instead of clustering around them and needs no SESOI conversion. The fast estimator is the planning tool and a robustness check.
@@ -295,10 +296,13 @@ RUN_BRMS_FULL=1 BRMS_TRUTH=cue Rscript scripts/05_brms_primary_model.R   # full-
 
 Runtimes of the full run (`SIM_FULL=1`, Intel Core i9-14900HX, R 4.6.0 on Windows 11). With 31 workers: script 03, 7.3 minutes (it runs on one core). Script 04 took 108 minutes on 8 workers while two other simulation jobs shared the machine. Scripts 01, 02, and 06 were rerun after the palter term and the request jackknife were added, on 16 workers while three brms fits used most of the other cores: script 01, 1.3 minutes; script 02, about 139 minutes of running time; script 06, 219 minutes. The jackknife's 48 refits per study make up most of that. The tests take about 40 seconds. Script 05's runtimes are in its section above.
 
+With the small-sample options added (999 bootstrap draws per study), scripts 02 and 06 were rerun on 16 workers while brms fits used other cores: 138.7 and 204.0 minutes.
+
 Environment variables:
 
 - `SIM_R` and `SIM_R6` set the number of studies per condition in scripts 02 and 06.
 - `SIM_REUSE=1` summarizes saved simulations without rerunning them (scripts 02 and 06).
+- `SIM_BOOT` sets the number of request-bootstrap draws per study in scripts 02 and 06 (default 999; 0 skips the bootstrap).
 - `BRMS_TRUTH` sets the true state for script 05. After full-size fits, `Rscript scripts/05b_brms_rule_comparison.R` re-scores them under the matched rule.
 
 On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries pinned here (rstan 2.32.7 with StanHeaders 2.39.1), rstan's compiler plugin adds `-std=c++1y`, which overrides the C++17 standard StanHeaders needs, and every model fails to compile. Point `R_MAKEVARS_USER` at a file containing `CXX17FLAGS += -std=gnu++17` before running script 05.
@@ -307,13 +311,13 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 |---|---|
 | `R/design.R` | Parameters, the four true states, the latent mean and marginal SD, cells, and the contrast matrix |
 | `R/simulate.R` | Simulates one study; computes the exact population for pseudo-true values |
-| `R/analyze.R` | Pattern-level fit, analytic scores, cluster-robust covariance (participant, two-way, and two-way with the request jackknife), tests, verdict, SESOI conversion |
+| `R/analyze.R` | Pattern-level fit, analytic scores, cluster-robust covariance (participant, two-way, and two-way with the request jackknife), small-sample options (Satterthwaite df, request score bootstrap), tests, verdict, SESOI conversion |
 | `R/ppi.R` | Prediction-powered inference, PPI++, and simulated reviewers |
 | `R/audit.R` | Toy request bank, ridge classifier, grouped folds, permutation test |
 | `R/plots.R` | APA-style figures |
 | `scripts/01`–`06` | Recovery; power and adjudication; simulated reviewers; tell audit; primary model; sensitivity |
 | `scripts/05b` | Re-scores the saved full-size brms posteriors under a rule matched to the fast estimator's |
-| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds |
+| `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, the Satterthwaite df against exact moments in a linear model, the request score bootstrap against a direct computation, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds |
 
 ## What this does not show
 
@@ -322,7 +326,7 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 - **The primary model leaves out two things the simulation allows.** It has no participant slope for tactics, so if people differ in susceptibility (script 03 sets that SD to 0.3; the power runs set it to 0), its T1 and T2 intervals would be too narrow. And it fits one request-intercept SD, while unsafe requests vary more than safe ones in the simulation. `(1 + unsafe + tactic | pid)` and separate request SDs for safe and unsafe requests (`gr(item, by = unsafe)` in brms) would match the simulation; neither has been fitted here.
 - **The SESOI conversion uses the true variance components.** In practice they would be estimated. Section 3 shows how much a misestimated τ_c moves the verdicts.
 - **The primary model has no palter term.** The fast estimator now includes one; the brms formula still relies on request intercepts to absorb paltering's average cost, which can't capture that the evidence screen removes it. Its contrasts drop the palter weights.
-- **No version of the two-way errors reaches 95% coverage** with 48 requests (section 2). A bias-reduced sandwich (CR2) with Satterthwaite degrees of freedom (Pustejovsky & Tipton, 2018) or a wild cluster bootstrap would be the next things to try; neither is implemented here.
+- **No version of the two-way errors reaches 95% coverage for every contrast** with 48 requests (section 2). The request score bootstrap reaches it for T1 and T3 under the defaults but not for T2, and its worst contrast across scenarios is 92.9% to 94.8% (`notes/small_sample_request_inference.md`). A bias-reduced (CR2) sandwich is not implemented.
 - **The true states sit at the extremes** (κ of 0 or 0.5, γ of 0 or 0.3), apart from two sensitivity scenarios.
 - **The request-level problem isn't solved here.** Section 4 shows that it exists and that doubling the requests each participant reviews helps, but not how many requests are enough, and not a bank larger than any one participant sees, which the code doesn't yet support.
 - **The simulator's failure modes are settings, not measurements.** Their sizes would come from the registered simulated-reviewer predictions in the real study.
@@ -353,6 +357,8 @@ Levy, J., Yang, M., & Pelrine, K. (2026). *AI persuasion as a threat to human co
 Modirrousta-Galian, A., & Higham, P. A. (2023). Gamified inoculation interventions do not improve discrimination between true and fake news: Reanalyzing existing research with receiver operating characteristic analysis. *Journal of Experimental Psychology: General, 152*(9), 2411–2437. https://doi.org/10.1037/xge0001395
 
 Pustejovsky, J. E., & Tipton, E. (2018). Small-sample methods for cluster-robust variance estimation and hypothesis testing in fixed effects models. *Journal of Business & Economic Statistics, 36*(4), 672–683. https://doi.org/10.1080/07350015.2016.1247004
+
+Roodman, D., MacKinnon, J. G., Nielsen, M. Ø., & Webb, M. D. (2019). Fast and wild: Bootstrap inference in Stata using boottest. *The Stata Journal, 19*(1), 4–60. https://doi.org/10.1177/1536867X19830877
 
 Simchon, A., Zipori, T., Teitelbaum, L., Lewandowsky, S., & van der Linden, S. (2026). A signal detection theory meta-analysis of psychological inoculation against misinformation. *Current Opinion in Psychology, 67*, Article 102194. https://doi.org/10.1016/j.copsyc.2025.102194
 
