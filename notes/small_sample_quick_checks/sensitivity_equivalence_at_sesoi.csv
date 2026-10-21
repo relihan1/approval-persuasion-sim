@@ -1,3 +1,0 @@
-"test","equiv_pid","equiv_two_way","equiv_two_way_jk","equiv_two_way_sw","equiv_two_way_jk_sw","equiv_two_way_boot","equiv_pid_pilot_tau_c_0.3","equiv_two_way_pilot_tau_c_0.3","equiv_two_way_jk_pilot_tau_c_0.3","equiv_two_way_jk_sw_pilot_tau_c_0.3","equiv_pid_no_conversion","equiv_two_way_no_conversion","equiv_two_way_jk_no_conversion","equiv_two_way_jk_sw_no_conversion","mcse_at_5pct"
-"T3_plain",0.03,0.055,0.04,0.04,0.035,0.02,0.03,0.1,0.09,0.07,0.14,0.175,0.16,0.14,0.0154110350074224
-"T3_tactic",0.05,0.055,0.055,0.055,0.045,0.04,0.08,0.09,0.085,0.07,0.145,0.195,0.16,0.145,0.0154110350074224

@@ -1,6 +1,6 @@
 # df_calibration.R: compares the Satterthwaite degrees of freedom for the request
 # part of the jackknifed two-way variance with 2 mean(V)^2 / var(V) across
-# simulated studies. Run from the project root: OUTDIR=<folder> Rscript notes/small_sample_quick_checks/df_calibration.R
+# simulated studies. Run from the project root: OUTDIR=<folder> Rscript notes/small_sample_checks/df_calibration.R
 # Do the Satterthwaite df describe how much the request part of the variance
 # varies from study to study? Empirical df = 2 mean(V)^2 / var(V) across
 # simulated studies, against the mean of the per-study estimates.
