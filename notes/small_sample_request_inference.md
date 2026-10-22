@@ -85,7 +85,7 @@ Tests (`tests/testthat/test-small-sample.R`, 49 expectations; the full suite now
 
 **If one option is chosen, the bootstrap fits the preregistration's needs best.**
 
-- It is the only version whose T3 intervals cover at the nominal 95% under the defaults (94.5–95.4). Its T3 equivalence tests are at or below 5% (3.8 and 4.9); jackknife + *t* comes close (4.6 and 5.4, the latter within Monte Carlo error of 5%), but its T3 intervals cover 94.0–94.5.
+- It is the only version whose T3 intervals cover at the nominal 95% under the defaults (94.5–95.4). Its T3 equivalence tests are at or below 5% (3.8 and 4.9); jackknife + *t* comes close (4.6 and 5.4, the latter within Monte Carlo error of 5%), but its T3 intervals cover 93.9–94.6 across the true states.
 - It costs no correct verdicts at 125 per cell.
 - Its weak spots are T2 (94.0%) and over-wide T4 and T5 intervals.
 
