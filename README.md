@@ -2,9 +2,9 @@
 
 **A simulation-based design analysis for a study of whether AI agents can argue their way past human approval**
 
-Dr. Daniel P. Relihan · R · MIT license
+Dr. Daniel P. Relihan · R · MIT license · Built with Claude under my direction ([how this was made](#how-this-was-made))
 
-Coding agents ask people to approve risky actions, such as reading a credential, merging a change, or silencing an alert. Anthropic keeps its agent's own messages away from the classifier that screens riskier actions in Claude Code's auto mode, "so the agent can't talk the classifier into making a bad call," and reports that "Claude Code users approve 93% of permission prompts" (Hughes, 2026). Levy et al. (2026) ask the human version of that question. They list training overseers to recognize persuasion tactics and paraphrasing AI messages among possible defenses, and suggest human experiments as the next phase of evaluation.
+Coding agents ask people to approve risky actions, such as reading a credential, merging a change, or silencing an alert. Anthropic keeps its agent's own messages away from the classifier that screens riskier actions in Claude Code's auto mode, "so the agent can't talk the classifier into making a bad call," and reports that users accept 93% of manual permission prompts (Hughes, 2026). Levy et al. (2026) ask the human version of that question. They list training overseers to recognize persuasion tactics and paraphrasing AI messages among possible defenses, and suggest human experiments as the next phase of evaluation.
 
 This repository simulates such an experiment before anyone runs it. It writes down the data-generating process I expect, fits the analysis I would preregister, and asks four questions:
 
@@ -354,6 +354,10 @@ On Windows, brms needs Rtools 4.5 to compile Stan models. With the CRAN binaries
 | `scripts/01`–`06` | Recovery; power and adjudication; simulated reviewers; tell audit; primary model; sensitivity |
 | `scripts/05b` | Re-scores the saved full-size brms posteriors under a rule matched to the fast estimator's |
 | `tests/testthat/` | Counterbalancing, marginal SD against simulation, scores against numerical derivatives (summed and per row), the sandwich's bread and its behavior under independence, the request jackknife against brute-force refits, the Satterthwaite df against exact moments in a linear model, the request score bootstrap against a direct computation, paltering's structure in the fitted model, pseudo-true values, the SESOI conversion, Holm with a missing test, decision rule, PPI, AUC, folds, the primary model's convergence rule |
+
+## How this was made
+
+The study this repository simulates, and the two accounts it tests, come from my research direction for FAR.AI. I built the repository with Claude, Anthropic's AI model. Claude wrote the R code and drafted this README, first in a Claude chat session and then in Claude Code, which is why every commit lists Claude as a co-author. I set what the simulation had to answer and the standards it worked to, including that every citation be checked against the paper itself and every result be described as a property of the assumed model. When checks turned up problems, I made the calls on what to change, such as moving to two-way clustered errors once it was clear that requests could differ in how tactics and training affect them. Automated tests and independent reviews by separate Claude sessions checked the work. I'm responsible for any errors.
 
 ## What this does not show
 
